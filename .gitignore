@@ -1,0 +1,16 @@
+# Odoo source code (cloned locally for reference)
+/odoo/
+
+# Python cache
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+
+# IDE settings
+.vscode/
+.idea/
+
+# OS specific files
+.DS_Store
+Thumbs.db
