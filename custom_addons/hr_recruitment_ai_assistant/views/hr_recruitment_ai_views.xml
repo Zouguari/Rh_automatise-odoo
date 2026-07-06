@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Vue Liste -->
+    <record id="view_hr_recruitment_ai_generator_tree" model="ir.ui.view">
+        <field name="name">hr.recruitment.ai.generator.tree</field>
+        <field name="model">hr.recruitment.ai.generator</field>
+        <field name="arch" type="xml">
+            <tree string="Générations de Descriptions">
+                <field name="name"/>
+                <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-success="state == 'generated'"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- Vue Formulaire -->
+    <record id="view_hr_recruitment_ai_generator_form" model="ir.ui.view">
+        <field name="name">hr.recruitment.ai.generator.form</field>
+        <field name="model">hr.recruitment.ai.generator</field>
+        <field name="arch" type="xml">
+            <form string="Générateur de Description de Poste">
+                <header>
+                    <button name="action_generate_description" 
+                            string="Générer avec l'IA" 
+                            type="object" 
+                            class="oe_highlight btn-primary" 
+                            invisible="state == 'generated'"
+                            icon="fa-magic"/>
+                    <button name="action_generate_description" 
+                            string="Régénérer avec l'IA" 
+                            type="object" 
+                            class="btn-secondary" 
+                            invisible="state == 'draft'"
+                            icon="fa-refresh"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Titre du poste ciblé"/>
+                        <h1>
+                            <field name="name" placeholder="Ex: Développeur Odoo / Python"/>
+                        </h1>
+                    </div>
+                    <notebook>
+                        <page string="Critères &amp; Compétences" name="criteria_page">
+                            <group>
+                                <field name="key_skills" 
+                                       placeholder="Saisissez ici les compétences, outils et prérequis (ex: Python, Odoo, PostgreSQL, Docker, Git...)" 
+                                       style="min-height: 120px;"/>
+                            </group>
+                        </page>
+                        <page string="Description Générée" name="description_page">
+                            <field name="generated_description" widget="html" options="{'style-inline': true}"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action Fenêtre -->
+    <record id="action_hr_recruitment_ai_generator" model="ir.actions.act_window">
+        <field name="name">Générateur de Poste</field>
+        <field name="res_model">hr.recruitment.ai.generator</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Créez votre première description de poste avec l'IA !
+            </p>
+            <p>
+                Renseignez le titre du poste et les compétences clés, puis cliquez sur "Générer avec l'IA".
+            </p>
+        </field>
+    </record>
+
+    <!-- Menus -->
+    <menuitem id="menu_hr_recruitment_ai_root" 
+              name="Assistant RH IA" 
+              web_icon="hr_recruitment_ai_assistant,static/description/icon.png"
+              sequence="10"/>
+
+    <menuitem id="menu_hr_recruitment_ai_generator" 
+              name="Générateur de Poste" 
+              parent="menu_hr_recruitment_ai_root" 
+              action="action_hr_recruitment_ai_generator" 
+              sequence="10"/>
+</odoo>

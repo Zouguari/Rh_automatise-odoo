@@ -18,7 +18,8 @@
         'hr_recruitment',
     ],
     'data': [
-        # Les fichiers XML de sécurité et de vues seront ajoutés ici lors du développement
+        'security/ir.model.access.csv',
+        'views/hr_recruitment_ai_views.xml',
     ],
     'demo': [],
     'installable': True,
