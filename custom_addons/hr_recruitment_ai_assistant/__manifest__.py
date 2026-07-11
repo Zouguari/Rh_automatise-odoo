@@ -20,6 +20,7 @@
     'data': [
         'security/ir.model.access.csv',
         'views/hr_recruitment_ai_views.xml',
+        'views/hr_applicant_views.xml',
     ],
     'demo': [],
     'installable': True,

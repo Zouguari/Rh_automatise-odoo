@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="hr_applicant_form_ai_inherit" model="ir.ui.view">
+        <field name="name">hr.applicant.form.ai.inherit</field>
+        <field name="model">hr.applicant</field>
+        <field name="inherit_id" ref="hr_recruitment.hr_applicant_view_form"/>
+        <field name="arch" type="xml">
+
+            <!-- Bouton d'action dans le header -->
+            <xpath expr="//header" position="inside">
+                <button name="action_reset_ai_processing" type="object"
+                        string="Relancer analyse IA" class="btn-secondary"/>
+                <button name="action_extract_cv_text" type="object"
+                        string="Extraire texte du CV" class="btn-primary"/>
+                <field name="ai_processing_state" widget="statusbar"/>
+                <field name="cv_extraction_state" widget="statusbar"/>
+            </xpath>
+
+            <!-- Nouvel onglet dédié à l'IA -->
+            <xpath expr="//notebook" position="inside">
+                <page string="Analyse IA" name="ai_analysis">
+                    <group>
+                        <group string="Score et recommandation">
+                            <field name="ai_score" widget="progressbar"/>
+                            <field name="ai_recommendation"/>
+                            <field name="is_potential_duplicate"/>
+                        </group>
+                        <group string="Doublons">
+                            <field name="duplicate_applicant_ids" widget="many2many_tags"/>
+                        </group>
+                    </group>
+                    <group string="Résumé">
+                        <field name="ai_summary" nolabel="1"/>
+                    </group>
+                    <group string="Données extraites">
+                        <field name="extracted_skills"/>
+                        <field name="extracted_education"/>
+                        <field name="extracted_experience"/>
+                        <field name="extracted_languages"/>
+                        <field name="extracted_certifications"/>
+                    </group>
+                    <group string="Texte brut du CV">
+                        <field name="cv_raw_text" nolabel="1" readonly="1"/>
+                    </group>
+                </page>
+            </xpath>
+
+        </field>
+    </record>
+
+    <!-- Ajout du score dans la vue liste -->
+    <record id="hr_applicant_list_ai_inherit" model="ir.ui.view">
+        <field name="name">hr.applicant.list.ai.inherit</field>
+        <field name="model">hr.applicant</field>
+        <field name="inherit_id" ref="hr_recruitment.crm_case_tree_view_job"/>
+        <field name="arch" type="xml">
+            <xpath expr="//tree" position="inside">
+                <field name="ai_score" optional="show"/>
+                <field name="ai_recommendation" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
