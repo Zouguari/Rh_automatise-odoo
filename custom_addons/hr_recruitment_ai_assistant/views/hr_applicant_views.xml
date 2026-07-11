@@ -15,6 +15,8 @@
                 <button name="action_ai_extract_structured_data" type="object"
                         string="Analyser avec l'IA" class="btn-primary"
                         invisible="cv_extraction_state != 'extracted'"/>
+                <button name="action_detect_duplicates" type="object"
+                        string="Vérifier doublons" class="btn-secondary"/>
                 <field name="ai_processing_state" widget="statusbar"/>
                 <field name="cv_extraction_state" widget="statusbar"/>
             </xpath>
@@ -22,14 +24,18 @@
             <!-- Nouvel onglet dédié à l'IA -->
             <xpath expr="//notebook" position="inside">
                 <page string="Analyse IA" name="ai_analysis">
+                    <div class="alert alert-warning" role="alert" invisible="not is_potential_duplicate">
+                        <strong>⚠️ Doublon potentiel détecté</strong> — ce candidat correspond peut-être à une candidature existante.
+                    </div>
                     <group>
                         <group string="Score et recommandation">
                             <field name="ai_score" widget="progressbar"/>
                             <field name="ai_recommendation"/>
-                            <field name="is_potential_duplicate"/>
                         </group>
                         <group string="Doublons">
-                            <field name="duplicate_applicant_ids" widget="many2many_tags"/>
+                            <field name="is_potential_duplicate"/>
+                            <field name="duplicate_applicant_ids" widget="many2many_tags"
+                                   options="{'no_create': True}"/>
                         </group>
                     </group>
                     <group string="Résumé">
