@@ -1,0 +1,95 @@
+<odoo>
+    <record id="email_template_application_confirmation" model="mail.template">
+        <field name="name">Recrutement - Confirmation de candidature</field>
+        <field name="model_id" ref="hr_recruitment.model_hr_applicant"/>
+        <field name="subject">Confirmation de votre candidature - {{ object.job_id.name }}</field>
+        <field name="email_from">{{ (object.user_id.email_formatted or user.email_formatted) }}</field>
+        <field name="email_to">{{ object.email_from }}</field>
+        <field name="body_html" type="html">
+            <div>
+                <p>Bonjour {{ object.partner_name or 'Candidat(e)' }},</p>
+                <p>Nous confirmons la bonne réception de votre candidature pour le poste de
+                   <strong>{{ object.job_id.name }}</strong>.</p>
+                <p>Notre équipe RH va étudier votre profil et reviendra vers vous prochainement.</p>
+                <p>Cordialement,<br/>L'équipe Recrutement</p>
+            </div>
+        </field>
+        <field name="auto_delete" eval="True"/>
+    </record>
+
+    <record id="email_template_interview_invitation" model="mail.template">
+        <field name="name">Recrutement - Invitation entretien</field>
+        <field name="model_id" ref="hr_recruitment.model_hr_applicant"/>
+        <field name="subject">Invitation à un entretien - {{ object.job_id.name }}</field>
+        <field name="email_from">{{ (object.user_id.email_formatted or user.email_formatted) }}</field>
+        <field name="email_to">{{ object.email_from }}</field>
+        <field name="body_html" type="html">
+            <div>
+                <p>Bonjour {{ object.partner_name or 'Candidat(e)' }},</p>
+                <p>Votre candidature pour le poste de <strong>{{ object.job_id.name }}</strong> a retenu notre attention.</p>
+                <p>Nous souhaiterions vous rencontrer pour un entretien. Notre équipe vous contactera
+                   prochainement pour convenir d'un créneau.</p>
+                <p>Cordialement,<br/>L'équipe Recrutement</p>
+            </div>
+        </field>
+        <field name="auto_delete" eval="True"/>
+    </record>
+
+    <record id="email_template_refusal" model="mail.template">
+        <field name="name">Recrutement - Refus de candidature</field>
+        <field name="model_id" ref="hr_recruitment.model_hr_applicant"/>
+        <field name="subject">Suite à votre candidature - {{ object.job_id.name }}</field>
+        <field name="email_from">{{ (object.user_id.email_formatted or user.email_formatted) }}</field>
+        <field name="email_to">{{ object.email_from }}</field>
+        <field name="body_html" type="html">
+            <div>
+                <p>Bonjour {{ object.partner_name or 'Candidat(e)' }},</p>
+                <p>Nous vous remercions de l'intérêt porté à notre entreprise et au poste de
+                   <strong>{{ object.job_id.name }}</strong>.</p>
+                <p>Après étude attentive de votre profil, nous avons malheureusement décidé de ne pas
+                   donner suite à votre candidature pour ce poste.</p>
+                <p>Nous conservons votre CV et ne manquerons pas de vous recontacter si une opportunité
+                   correspondant à votre profil se présente.</p>
+                <p>Cordialement,<br/>L'équipe Recrutement</p>
+            </div>
+        </field>
+        <field name="auto_delete" eval="True"/>
+    </record>
+
+    <record id="email_template_acceptance" model="mail.template">
+        <field name="name">Recrutement - Acceptation</field>
+        <field name="model_id" ref="hr_recruitment.model_hr_applicant"/>
+        <field name="subject">Félicitations - Offre pour le poste de {{ object.job_id.name }}</field>
+        <field name="email_from">{{ (object.user_id.email_formatted or user.email_formatted) }}</field>
+        <field name="email_to">{{ object.email_from }}</field>
+        <field name="body_html" type="html">
+            <div>
+                <p>Bonjour {{ object.partner_name or 'Candidat(e)' }},</p>
+                <p>Nous avons le plaisir de vous informer que votre candidature pour le poste de
+                   <strong>{{ object.job_id.name }}</strong> a été retenue.</p>
+                <p>Notre équipe RH vous contactera prochainement pour finaliser les démarches
+                   d'intégration.</p>
+                <p>Cordialement,<br/>L'équipe Recrutement</p>
+            </div>
+        </field>
+        <field name="auto_delete" eval="True"/>
+    </record>
+
+    <record id="email_template_document_request" model="mail.template">
+        <field name="name">Recrutement - Demande de documents</field>
+        <field name="model_id" ref="hr_recruitment.model_hr_applicant"/>
+        <field name="subject">Documents complémentaires requis - {{ object.job_id.name }}</field>
+        <field name="email_from">{{ (object.user_id.email_formatted or user.email_formatted) }}</field>
+        <field name="email_to">{{ object.email_from }}</field>
+        <field name="body_html" type="html">
+            <div>
+                <p>Bonjour {{ object.partner_name or 'Candidat(e)' }},</p>
+                <p>Dans le cadre du traitement de votre candidature pour le poste de
+                   <strong>{{ object.job_id.name }}</strong>, merci de nous transmettre les documents
+                   suivants : copie de diplôme, certificats de travail, pièce d'identité.</p>
+                <p>Cordialement,<br/>L'équipe Recrutement</p>
+            </div>
+        </field>
+        <field name="auto_delete" eval="True"/>
+    </record>
+</odoo>

@@ -20,9 +20,11 @@
     'data': [
         'security/ir.model.access.csv',
         'data/ir_config_parameter_data.xml',
+        'data/mail_templates.xml',
         'views/hr_recruitment_ai_views.xml',
         'views/hr_applicant_views.xml',
         'views/hr_job_views.xml',
+        'views/hr_recruitment_stage_views.xml',
     ],
     'demo': [],
     'installable': True,

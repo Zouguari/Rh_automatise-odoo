@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="hr_recruitment_stage_form_ai_inherit" model="ir.ui.view">
+        <field name="name">hr.recruitment.stage.form.ai.inherit</field>
+        <field name="model">hr.recruitment.stage</field>
+        <field name="inherit_id" ref="hr_recruitment.hr_recruitment_stage_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="inside">
+                <group string="Automatisation email">
+                    <field name="auto_email_template_id"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>

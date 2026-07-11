@@ -295,6 +295,23 @@ class HrApplicant(models.Model):
 
         return matches
 
+    def write(self, vals):
+        result = super().write(vals)
+        if 'stage_id' in vals:
+            for applicant in self:
+                applicant._send_stage_automatic_email()
+        return result
+
+    def _send_stage_automatic_email(self):
+        self.ensure_one()
+        if not self.email_from:
+            return  # pas d'email connu, on ne peut pas envoyer
+
+        template = self.stage_id.auto_email_template_id
+        if template:
+            template.send_mail(self.id, force_send=True)
+
+
 
 
 
