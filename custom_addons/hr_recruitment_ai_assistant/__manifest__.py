@@ -19,6 +19,7 @@
     ],
     'data': [
         'security/ir.model.access.csv',
+        'data/ir_config_parameter_data.xml',
         'views/hr_recruitment_ai_views.xml',
         'views/hr_applicant_views.xml',
     ],

@@ -2,12 +2,40 @@
 
 import base64
 import io
+import json
 import logging
+import requests
 import pdfplumber
 from docx import Document as DocxDocument
 from odoo import models, fields, api
+from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
+
+GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+
+EXTRACTION_PROMPT = """Tu es un assistant RH spécialisé dans l'analyse de CV.
+Analyse le texte de CV suivant et réponds UNIQUEMENT avec un objet JSON valide, sans aucun texte avant ou après, sans balises markdown.
+
+Le JSON doit avoir exactement cette structure :
+{
+  "summary": "résumé du profil en 2-3 phrases",
+  "skills": ["compétence1", "compétence2"],
+  "education": ["diplôme - établissement - année"],
+  "experience": ["poste - entreprise - période - description courte"],
+  "languages": ["langue (niveau)"],
+  "certifications": ["certification1"]
+}
+
+Si une section est absente du CV, renvoie une liste vide pour cette clé.
+Ne traduis pas le contenu, garde la langue d'origine du CV.
+
+Voici le texte du CV :
+---
+{cv_text}
+---
+"""
 
 
 class HrApplicant(models.Model):
@@ -61,6 +89,9 @@ class HrApplicant(models.Model):
         ('extracted', 'Texte extrait'),
         ('failed', 'Échec extraction'),
     ], string="État extraction", default='none')
+
+    # --- Étape 3 : intégration Gemini ---
+    ai_extraction_raw = fields.Text(string="Réponse brute Gemini (debug)")
 
     def action_reset_ai_processing(self):
         """Permet de relancer le traitement IA manuellement depuis la vue."""
@@ -133,4 +164,66 @@ class HrApplicant(models.Model):
         for image in images:
             text += pytesseract.image_to_string(image, lang='fra+eng') + "\n"
         return text
+
+    def action_ai_extract_structured_data(self):
+        """Appelle Gemini pour extraire les données structurées du CV."""
+        for applicant in self:
+            if not applicant.cv_raw_text:
+                raise UserError("Aucun texte de CV disponible. Lance d'abord l'extraction du CV.")
+
+            applicant.ai_processing_state = 'processing'
+            try:
+                result = applicant._call_gemini_extraction(applicant.cv_raw_text)
+                applicant._apply_gemini_result(result)
+                applicant.ai_processing_state = 'done'
+            except Exception as e:
+                _logger.error("Erreur extraction Gemini pour %s: %s", applicant.partner_name, e)
+                applicant.ai_processing_state = 'error'
+                raise UserError(f"Erreur lors de l'analyse IA : {e}")
+
+    def _call_gemini_extraction(self, cv_text):
+        api_key = self.env['ir.config_parameter'].sudo().get_param('smart_hr_ai.gemini_api_key')
+        if not api_key:
+            raise UserError("Clé API Gemini non configurée dans les paramètres système.")
+
+        prompt = EXTRACTION_PROMPT.replace("{cv_text}", cv_text)
+
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": 0.1,
+                "response_mime_type": "application/json",
+            },
+        }
+
+        response = requests.post(
+            f"{GEMINI_URL}?key={api_key}",
+            json=payload,
+            timeout=60,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        self.ai_extraction_raw = json.dumps(data, ensure_ascii=False, indent=2)
+
+        text_response = data["candidates"][0]["content"]["parts"][0]["text"]
+        return json.loads(text_response)
+
+    def _apply_gemini_result(self, result):
+        self.ensure_one()
+
+        def _format_list(items):
+            if not items:
+                return ""
+            return "\n".join(f"- {item}" for item in items)
+
+        self.write({
+            'ai_summary': result.get('summary', ''),
+            'extracted_skills': _format_list(result.get('skills', [])),
+            'extracted_education': _format_list(result.get('education', [])),
+            'extracted_experience': _format_list(result.get('experience', [])),
+            'extracted_languages': _format_list(result.get('languages', [])),
+            'extracted_certifications': _format_list(result.get('certifications', [])),
+        })
+
 

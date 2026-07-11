@@ -12,6 +12,9 @@
                         string="Relancer analyse IA" class="btn-secondary"/>
                 <button name="action_extract_cv_text" type="object"
                         string="Extraire texte du CV" class="btn-primary"/>
+                <button name="action_ai_extract_structured_data" type="object"
+                        string="Analyser avec l'IA" class="btn-primary"
+                        invisible="cv_extraction_state != 'extracted'"/>
                 <field name="ai_processing_state" widget="statusbar"/>
                 <field name="cv_extraction_state" widget="statusbar"/>
             </xpath>
@@ -41,6 +44,9 @@
                     </group>
                     <group string="Texte brut du CV">
                         <field name="cv_raw_text" nolabel="1" readonly="1"/>
+                    </group>
+                    <group string="Debug - Réponse brute Gemini">
+                        <field name="ai_extraction_raw" nolabel="1" readonly="1"/>
                     </group>
                 </page>
             </xpath>
