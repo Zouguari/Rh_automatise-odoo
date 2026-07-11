@@ -187,11 +187,14 @@ class HrApplicant(models.Model):
                 raise UserError(f"Erreur lors de l'analyse IA : {e}")
 
     def _call_gemini_extraction(self, cv_text):
+        prompt = EXTRACTION_PROMPT.replace("{cv_text}", cv_text)
+        return self._call_gemini_json(prompt)
+
+    def _call_gemini_json(self, prompt):
+        """Appel générique à Gemini qui renvoie un JSON parsé. Réutilisé par extraction et scoring."""
         api_key = self.env['ir.config_parameter'].sudo().get_param('smart_hr_ai.gemini_api_key')
         if not api_key:
             raise UserError("Clé API Gemini non configurée dans les paramètres système.")
-
-        prompt = EXTRACTION_PROMPT.replace("{cv_text}", cv_text)
 
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
@@ -210,10 +213,12 @@ class HrApplicant(models.Model):
         response.raise_for_status()
         data = response.json()
 
-        self.ai_extraction_raw = json.dumps(data, ensure_ascii=False, indent=2)
+        if self and len(self) == 1 and self.id:
+            self.ai_extraction_raw = json.dumps(data, ensure_ascii=False, indent=2)
 
         text_response = data["candidates"][0]["content"]["parts"][0]["text"]
         return json.loads(text_response)
+
 
     def _apply_gemini_result(self, result):
         self.ensure_one()

@@ -2,4 +2,7 @@
 
 from . import hr_recruitment_ai
 from . import hr_applicant
+from . import hr_job
+from . import ai_scoring
+
 

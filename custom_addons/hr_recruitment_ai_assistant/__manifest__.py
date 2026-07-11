@@ -22,6 +22,7 @@
         'data/ir_config_parameter_data.xml',
         'views/hr_recruitment_ai_views.xml',
         'views/hr_applicant_views.xml',
+        'views/hr_job_views.xml',
     ],
     'demo': [],
     'installable': True,

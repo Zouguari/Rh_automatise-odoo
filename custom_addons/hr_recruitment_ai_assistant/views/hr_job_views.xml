@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="hr_job_form_ai_inherit" model="ir.ui.view">
+        <field name="name">hr.job.form.ai.inherit</field>
+        <field name="model">hr.job</field>
+        <field name="inherit_id" ref="hr.view_hr_job_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Exigences IA" name="ai_requirements">
+                    <group>
+                        <field name="required_skills" placeholder="Python&#10;Django&#10;PostgreSQL"/>
+                        <field name="required_experience_years"/>
+                        <field name="required_education_level"/>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>
