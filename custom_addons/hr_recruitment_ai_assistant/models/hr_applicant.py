@@ -7,6 +7,7 @@ import logging
 import requests
 import pdfplumber
 from docx import Document as DocxDocument
+from datetime import timedelta
 from odoo import models, fields, api
 from odoo.exceptions import UserError
 
@@ -45,6 +46,14 @@ Voici le texte du CV :
 
 class HrApplicant(models.Model):
     _inherit = 'hr.applicant'
+
+    interview_event_id = fields.Many2one(
+        'calendar.event',
+        string="Entretien planifié"
+    )
+    ai_interview_questions = fields.Text(
+        string="Questions d'entretien générées"
+    )
 
     # --- Champs IA / scoring ---
     ai_score = fields.Float(
@@ -300,6 +309,7 @@ class HrApplicant(models.Model):
         if 'stage_id' in vals:
             for applicant in self:
                 applicant._send_stage_automatic_email()
+                applicant._handle_interview_stage()
         return result
 
     def _send_stage_automatic_email(self):
@@ -310,6 +320,43 @@ class HrApplicant(models.Model):
         template = self.stage_id.auto_email_template_id
         if template:
             template.send_mail(self.id, force_send=True)
+
+    def _handle_interview_stage(self):
+        self.ensure_one()
+        interview_stage_names = ['First Interview', 'Second Interview']
+        if self.stage_id.name in interview_stage_names:
+            if not self.ai_interview_questions:
+                self.action_generate_interview_questions()
+            if not self.interview_event_id:
+                self.action_schedule_interview()
+
+    def action_schedule_interview(self):
+        """Crée un événement calendrier pour l'entretien, planifié le lendemain à 10h par défaut."""
+        for applicant in self:
+            if applicant.interview_event_id:
+                raise UserError("Un entretien est déjà planifié pour ce candidat.")
+
+            start = fields.Datetime.now() + timedelta(days=1)
+            start = start.replace(hour=10, minute=0, second=0)
+            stop = start + timedelta(hours=1)
+
+            partners = applicant.env.user.partner_id
+            attendees = [(4, partners.id)]
+            if applicant.interviewer_ids:
+                for interviewer in applicant.interviewer_ids:
+                    attendees.append((4, interviewer.partner_id.id))
+
+            event = self.env['calendar.event'].create({
+                'name': f"Entretien - {applicant.partner_name} - {applicant.job_id.name}",
+                'start': start,
+                'stop': stop,
+                'partner_ids': attendees,
+                'description': applicant.ai_interview_questions or "",
+                'res_id': applicant.id,
+                'res_model_id': self.env['ir.model']._get_id('hr.applicant'),
+            })
+
+            applicant.interview_event_id = event.id
 
 
 
