@@ -16,6 +16,8 @@
     'depends': [
         'hr',
         'hr_recruitment',
+        'project',
+        'hr_contract',
     ],
     'data': [
         'security/ir.model.access.csv',

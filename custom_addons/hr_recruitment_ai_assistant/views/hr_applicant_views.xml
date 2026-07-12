@@ -71,6 +71,20 @@
                         <field name="ai_extraction_raw" nolabel="1" readonly="1"/>
                     </group>
                 </page>
+                <page string="Onboarding" name="onboarding" invisible="not emp_id">
+                    <group string="Contrat">
+                        <field name="generated_contract_id"/>
+                    </group>
+                    <group string="Tâches d'onboarding">
+                        <field name="onboarding_task_ids">
+                            <tree>
+                                <field name="name"/>
+                                <field name="user_ids" widget="many2many_tags"/>
+                                <field name="state"/>
+                            </tree>
+                        </field>
+                    </group>
+                </page>
             </xpath>
 
         </field>

@@ -55,6 +55,14 @@ class HrApplicant(models.Model):
         string="Questions d'entretien générées"
     )
 
+    onboarding_task_ids = fields.One2many(
+        'project.task', 'applicant_origin_id',
+        string="Tâches d'onboarding"
+    )
+    generated_contract_id = fields.Many2one(
+        'hr.contract', string="Contrat généré"
+    )
+
     # --- Champs IA / scoring ---
     ai_score = fields.Float(
         string="Score IA (%)",
@@ -357,6 +365,58 @@ class HrApplicant(models.Model):
             })
 
             applicant.interview_event_id = event.id
+
+    def create_employee_from_applicant(self):
+        # Appelle le comportement natif d'Odoo (crée hr.employee, lie applicant à employee_id)
+        result = super(HrApplicant, self).create_employee_from_applicant()
+        for applicant in self:
+            if applicant.emp_id:
+                applicant._generate_onboarding_contract()
+                applicant._create_onboarding_tasks()
+        return result
+
+    def _generate_onboarding_contract(self):
+        self.ensure_one()
+        if self.generated_contract_id:
+            return
+
+        contract = self.env['hr.contract'].create({
+            'name': f"Contrat - {self.emp_id.name}",
+            'employee_id': self.emp_id.id,
+            'job_id': self.job_id.id,
+            'wage': self.salary_proposed or self.salary_expected or 0.0,
+            'state': 'draft',
+        })
+        self.generated_contract_id = contract.id
+
+    def _create_onboarding_tasks(self):
+        self.ensure_one()
+
+        # Cherche (ou crée) un projet dédié à l'onboarding
+        onboarding_project = self.env['project.project'].search(
+            [('name', '=', 'Onboarding RH')], limit=1
+        )
+        if not onboarding_project:
+            onboarding_project = self.env['project.project'].create({
+                'name': 'Onboarding RH',
+            })
+
+        task_templates = [
+            "Préparer le poste de travail et le matériel",
+            "Créer les accès (email, VPN, logiciels internes)",
+            "Planifier la journée d'accueil",
+            "Assigner un parrain/mentor",
+            "Remettre le livret d'accueil et les documents RH",
+            "Planifier la formation initiale",
+        ]
+
+        for title in task_templates:
+            self.env['project.task'].create({
+                'name': f"{title} - {self.emp_id.name}",
+                'project_id': onboarding_project.id,
+                'user_ids': [(4, self.emp_id.parent_id.user_id.id)] if self.emp_id.parent_id.user_id else False,
+                'applicant_origin_id': self.id,
+            })
 
 
 

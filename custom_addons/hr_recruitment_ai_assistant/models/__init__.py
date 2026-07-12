@@ -6,6 +6,7 @@ from . import hr_job
 from . import ai_scoring
 from . import hr_recruitment_stage
 from . import ai_interview
+from . import project_task
 
 
 
