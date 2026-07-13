@@ -4,7 +4,9 @@ import base64
 import io
 import json
 import logging
+import re
 import requests
+import time
 import pdfplumber
 from docx import Document as DocxDocument
 from datetime import timedelta
@@ -13,7 +15,7 @@ from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-flash-latest"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 
 EXTRACTION_PROMPT = """Tu es un assistant RH spécialisé dans l'analyse de CV.
@@ -207,8 +209,57 @@ class HrApplicant(models.Model):
         prompt = EXTRACTION_PROMPT.replace("{cv_text}", cv_text)
         return self._call_gemini_json(prompt)
 
-    def _call_gemini_json(self, prompt):
-        """Appel générique à Gemini qui renvoie un JSON parsé. Réutilisé par extraction et scoring."""
+    def _post_gemini_with_retry(self, api_key, payload, max_retries=3):
+        """Appelle l'API Gemini avec retry automatique sur erreurs serveur
+        temporaires (503 surchargé, 429 quota momentané)."""
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                response = requests.post(
+                    f"{GEMINI_URL}?key={api_key}",
+                    json=payload,
+                    timeout=60,
+                )
+                if response.status_code in (503, 429) and attempt < max_retries - 1:
+                    wait = 2 ** attempt  # 1s, 2s, 4s
+                    _logger.warning(
+                        "Gemini indisponible (%s), nouvelle tentative dans %ss (essai %s/%s)",
+                        response.status_code, wait, attempt + 1, max_retries,
+                    )
+                    time.sleep(wait)
+                    continue
+                response.raise_for_status()
+                return response.json()
+            except requests.exceptions.RequestException as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)
+                    continue
+        raise UserError(
+            f"L'API Gemini est indisponible après {max_retries} tentatives. "
+            "C'est généralement temporaire (serveurs Google surchargés) — réessaie dans "
+            f"quelques instants.\nDétail technique : {last_error}"
+        )
+
+    def _call_gemini_json(self, prompt, max_attempts=2):
+        """Appel générique à Gemini qui renvoie un JSON parsé. Réutilisé par extraction et scoring.
+        Si le JSON renvoyé est invalide, on relance toute la génération (pas juste le parsing)
+        jusqu'à max_attempts fois : c'est souvent un aléa ponctuel du modèle qui ne se
+        reproduit pas d'un essai à l'autre."""
+        last_error = None
+        for attempt in range(max_attempts):
+            try:
+                return self._call_gemini_json_once(prompt)
+            except UserError as e:
+                last_error = e
+                if attempt < max_attempts - 1:
+                    _logger.warning(
+                        "JSON Gemini invalide (essai %s/%s) pour %s, nouvelle génération : %s",
+                        attempt + 1, max_attempts, getattr(self, 'partner_name', 'N/A'), e,
+                    )
+        raise last_error
+
+    def _call_gemini_json_once(self, prompt):
         api_key = self.env['ir.config_parameter'].sudo().get_param('smart_hr_ai.gemini_api_key')
         if not api_key:
             raise UserError("Clé API Gemini non configurée dans les paramètres système.")
@@ -218,23 +269,79 @@ class HrApplicant(models.Model):
             "generationConfig": {
                 "temperature": 0.1,
                 "response_mime_type": "application/json",
-                "maxOutputTokens": 4096,
+                "maxOutputTokens": 8192,
+                # Les modèles "thinking" (ex: gemini-flash-latest -> gemini-3.5-flash)
+                # peuvent renvoyer un raisonnement interne en plus de la réponse finale.
+                # On désactive ce mode : on veut juste le JSON, pas le raisonnement.
+                "thinkingConfig": {"thinkingBudget": 0},
             },
         }
 
-        response = requests.post(
-            f"{GEMINI_URL}?key={api_key}",
-            json=payload,
-            timeout=60,
-        )
-        response.raise_for_status()
-        data = response.json()
+        data = self._post_gemini_with_retry(api_key, payload)
 
         if self and len(self) == 1 and self.id:
             self.ai_extraction_raw = json.dumps(data, ensure_ascii=False, indent=2)
 
-        text_response = data["candidates"][0]["content"]["parts"][0]["text"]
-        return json.loads(text_response)
+        candidate = data["candidates"][0]
+        finish_reason = candidate.get("finishReason")
+        if finish_reason == "MAX_TOKENS":
+            raise UserError(
+                "La réponse de l'IA a été coupée car elle dépassait la limite de tokens "
+                "(CV probablement trop long ou trop détaillé). "
+                "Consulte le champ 'Debug - Réponse brute Gemini' pour voir jusqu'où elle est allée, "
+                "et réessaie — si le problème persiste régulièrement, il faut augmenter encore "
+                "'maxOutputTokens' dans le code ou raccourcir le prompt."
+            )
+
+        # Par sécurité (au cas où le raisonnement ne serait pas totalement désactivable
+        # selon le modèle), on ignore les éventuels blocs marqués "thought": true
+        # et on concatène uniquement le texte de réponse final.
+        parts = candidate.get("content", {}).get("parts", [])
+        text_response = "".join(
+            part.get("text", "") for part in parts if not part.get("thought")
+        )
+        if not text_response.strip():
+            raise UserError(
+                "Gemini n'a renvoyé aucun contenu exploitable (réponse vide ou "
+                "uniquement du raisonnement interne). Consulte le champ "
+                "'Debug - Réponse brute Gemini' et réessaie."
+            )
+        return self._parse_gemini_json(text_response)
+
+    def _parse_gemini_json(self, text_response):
+        """Parse le JSON renvoyé par Gemini, avec tentative de réparation
+        si la réponse est légèrement mal formée (guillemets non échappés,
+        virgule finale, balises markdown résiduelles...)."""
+        cleaned = text_response.strip()
+
+        # Retire d'éventuelles balises markdown (```json ... ```)
+        if cleaned.startswith("```"):
+            cleaned = cleaned.strip("`")
+            if cleaned.lower().startswith("json"):
+                cleaned = cleaned[4:]
+            cleaned = cleaned.strip()
+
+        try:
+            return json.loads(cleaned)
+        except json.JSONDecodeError as first_error:
+            # Tentative de réparation légère : virgules finales avant } ou ]
+            repaired = re.sub(r',\s*([}\]])', r'\1', cleaned)
+            try:
+                result = json.loads(repaired)
+                _logger.warning(
+                    "Réponse Gemini réparée automatiquement (JSON initialement invalide) pour %s",
+                    getattr(self, 'partner_name', 'N/A'),
+                )
+                return result
+            except json.JSONDecodeError:
+                snippet = cleaned[max(0, first_error.pos - 80):first_error.pos + 80]
+                raise UserError(
+                    "La réponse de l'IA n'est pas un JSON valide "
+                    f"({first_error.msg} à la position {first_error.pos}).\n"
+                    f"Extrait autour de l'erreur : ...{snippet}...\n"
+                    "Consulte le champ 'Debug - Réponse brute Gemini' pour le détail complet, "
+                    "puis relance l'action."
+                )
 
 
     def _apply_gemini_result(self, result):
@@ -254,8 +361,21 @@ class HrApplicant(models.Model):
             'extracted_certifications': _format_list(result.get('certifications', [])),
         })
 
+    @api.onchange('job_id')
+    def _onchange_job_id_assign_recruiter(self):
+        """Pré-remplit automatiquement le recruteur (user_id) avec le responsable
+        recrutement défini sur le poste, si aucun recruteur n'a déjà été choisi
+        manuellement. L'utilisateur reste libre de le changer ensuite."""
+        if self.job_id and self.job_id.user_id and not self.user_id:
+            self.user_id = self.job_id.user_id
+
     @api.model_create_multi
     def create(self, vals_list):
+        for vals in vals_list:
+            if not vals.get('user_id') and vals.get('job_id'):
+                job = self.env['hr.job'].browse(vals['job_id'])
+                if job.user_id:
+                    vals['user_id'] = job.user_id.id
         applicants = super(HrApplicant, self).create(vals_list)
         applicants.action_detect_duplicates()
         return applicants
@@ -417,8 +537,3 @@ class HrApplicant(models.Model):
                 'user_ids': [(4, self.emp_id.parent_id.user_id.id)] if self.emp_id.parent_id.user_id else False,
                 'applicant_origin_id': self.id,
             })
-
-
-
-
-
