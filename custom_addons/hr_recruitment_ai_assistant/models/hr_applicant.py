@@ -123,6 +123,62 @@ class HrApplicant(models.Model):
     # --- Étape 3 : intégration Gemini ---
     ai_extraction_raw = fields.Text(string="Réponse brute Gemini (debug)")
 
+    def action_run_full_ai_pipeline(self):
+        """Enchaîne automatiquement les 4 étapes de l'analyse IA d'un candidat :
+        extraction du texte du CV, analyse IA structurée, calcul du score de
+        matching (si un poste est associé), génération des questions d'entretien.
+        S'arrête à la première étape qui échoue et indique clairement où."""
+        for applicant in self:
+            steps_done = []
+            try:
+                applicant.action_extract_cv_text()
+                if applicant.cv_extraction_state != 'extracted':
+                    raise UserError(
+                        "Aucun CV valide n'a pu être extrait (pas de fichier PDF/DOCX "
+                        "attaché, ou échec d'extraction). Pipeline arrêté ici."
+                    )
+                steps_done.append("Extraction du texte du CV")
+
+                applicant.action_ai_extract_structured_data()
+                steps_done.append("Analyse IA du profil")
+
+                if applicant.job_id:
+                    applicant.action_compute_match_score()
+                    steps_done.append("Calcul du score de matching")
+                else:
+                    _logger.info(
+                        "Pipeline IA : scoring ignoré pour %s (aucune offre associée)",
+                        applicant.partner_name,
+                    )
+
+                applicant.action_generate_interview_questions()
+                steps_done.append("Génération des questions d'entretien")
+
+            except UserError as e:
+                raise UserError(
+                    f"Pipeline IA interrompu pour {applicant.partner_name or applicant.id}.\n"
+                    f"Étapes réussies : {', '.join(steps_done) if steps_done else 'aucune'}.\n\n"
+                    f"Erreur rencontrée : {e}"
+                )
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': "Pipeline IA terminé",
+                'message': (
+                    "Toutes les étapes ont été exécutées avec succès pour : "
+                    f"{', '.join(self.mapped('partner_name'))}."
+                ),
+                'type': 'success',
+                'sticky': False,
+                # Recharge automatiquement la fiche après la notification,
+                # sinon les champs (score, questions, résumé...) restent
+                # affichés avec leur ancienne valeur jusqu'à un rafraîchissement manuel.
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            },
+        }
+
     def action_reset_ai_processing(self):
         """Permet de relancer le traitement IA manuellement depuis la vue."""
         self.write({'ai_processing_state': 'pending'})
@@ -133,7 +189,11 @@ class HrApplicant(models.Model):
             attachment = applicant._get_cv_attachment()
             if not attachment:
                 applicant.cv_extraction_state = 'none'
-                continue
+                raise UserError(
+                    "Aucun CV (PDF ou DOCX) n'est attaché à ce candidat.\n"
+                    "Ajoute le fichier via les pièces jointes (chatter) avant de "
+                    "lancer l'extraction."
+                )
 
             try:
                 file_data = base64.b64decode(attachment.datas)
