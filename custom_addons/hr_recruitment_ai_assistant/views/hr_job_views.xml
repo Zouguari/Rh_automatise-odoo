@@ -12,6 +12,11 @@
                         <field name="required_experience_years"/>
                         <field name="required_education_level"/>
                     </group>
+                    <button name="action_generate_job_description_ai"
+                            type="object"
+                            string="Générer la description Odoo avec l'IA"
+                            class="oe_highlight btn-primary"
+                            icon="fa-magic"/>
                 </page>
             </xpath>
         </field>
