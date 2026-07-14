@@ -23,6 +23,12 @@ Génère exactement 8 questions réparties ainsi :
 - 2 questions sur les compétences manquantes ou les points à approfondir
 - 2 questions comportementales/motivationnelles
 
+RÈGLE DE FORMAT JSON CRITIQUE : n'utilise JAMAIS de guillemets doubles (")
+à l'intérieur du texte des questions, même pour citer un mot ou une
+technologie. Utilise des guillemets simples (') ou des guillemets français
+(« ») si nécessaire, jamais de guillemets doubles droits, car cela
+casserait la structure du JSON.
+
 --- OFFRE D'EMPLOI ---
 Titre : {job_title}
 Compétences requises : {required_skills}

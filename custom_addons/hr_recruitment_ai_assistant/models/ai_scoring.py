@@ -24,6 +24,11 @@ Règles :
 - Prends en compte les compétences équivalentes ou proches (ex: Django compte comme du Python), pas seulement les correspondances exactes de mots.
 - Prends en compte l'expérience et le niveau d'études si pertinents.
 
+RÈGLE DE FORMAT JSON CRITIQUE : n'utilise JAMAIS de guillemets doubles (")
+à l'intérieur du texte des valeurs (explication, compétences...). Pour citer
+un terme, utilise des guillemets simples (') ou des guillemets français
+(« »), jamais de guillemets doubles droits, car cela casserait le JSON.
+
 --- OFFRE D'EMPLOI ---
 Titre : {job_title}
 Compétences requises : {required_skills}

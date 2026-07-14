@@ -9,6 +9,9 @@
                 <group string="Automatisation email">
                     <field name="auto_email_template_id"/>
                 </group>
+                <group string="Automatisation entretien IA">
+                    <field name="is_interview_stage"/>
+                </group>
             </xpath>
         </field>
     </record>

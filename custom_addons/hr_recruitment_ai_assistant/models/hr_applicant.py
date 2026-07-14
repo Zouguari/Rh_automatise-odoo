@@ -39,6 +39,12 @@ Le JSON doit avoir exactement cette structure :
 Si une section est absente du CV, renvoie une liste vide pour cette clé.
 Ne traduis pas le contenu, garde la langue d'origine du CV.
 
+RÈGLE DE FORMAT JSON CRITIQUE : n'utilise JAMAIS de guillemets doubles (")
+à l'intérieur du texte des valeurs (résumé, compétences, descriptions...).
+Si tu dois citer un terme ou un nom de technologie entre guillemets,
+utilise des guillemets simples (') ou des guillemets français (« »), jamais
+de guillemets doubles droits, car cela casserait la structure du JSON.
+
 Voici le texte du CV :
 ---
 {cv_text}
@@ -241,7 +247,7 @@ class HrApplicant(models.Model):
             f"quelques instants.\nDétail technique : {last_error}"
         )
 
-    def _call_gemini_json(self, prompt, max_attempts=2):
+    def _call_gemini_json(self, prompt, max_attempts=3):
         """Appel générique à Gemini qui renvoie un JSON parsé. Réutilisé par extraction et scoring.
         Si le JSON renvoyé est invalide, on relance toute la génération (pas juste le parsing)
         jusqu'à max_attempts fois : c'est souvent un aléa ponctuel du modèle qui ne se
@@ -451,8 +457,7 @@ class HrApplicant(models.Model):
 
     def _handle_interview_stage(self):
         self.ensure_one()
-        interview_stage_names = ['First Interview', 'Second Interview']
-        if self.stage_id.name in interview_stage_names:
+        if self.stage_id.is_interview_stage:
             if not self.ai_interview_questions:
                 self.action_generate_interview_questions()
             if not self.interview_event_id:
