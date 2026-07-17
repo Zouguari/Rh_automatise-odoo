@@ -21,6 +21,9 @@
                         invisible="cv_extraction_state != 'extracted'"/>
                 <button name="action_detect_duplicates" type="object"
                         string="Vérifier doublons" class="btn-secondary"/>
+                <button name="action_open_merge_wizard" type="object"
+                        string="⚠️ Fusionner les doublons" class="btn-warning"
+                        invisible="not is_potential_duplicate"/>
                 <button name="action_compute_match_score" type="object"
                         string="Calculer le score" class="btn-primary"
                         invisible="ai_processing_state != 'done'"/>

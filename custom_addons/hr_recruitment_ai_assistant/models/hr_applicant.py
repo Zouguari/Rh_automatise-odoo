@@ -524,6 +524,28 @@ class HrApplicant(models.Model):
         applicants.action_detect_duplicates()
         return applicants
 
+    def action_open_merge_wizard(self):
+        """Ouvre l'assistant de fusion, pré-rempli avec ce candidat et
+        les doublons déjà détectés."""
+        self.ensure_one()
+        if not self.duplicate_applicant_ids:
+            raise UserError(
+                "Aucun doublon détecté pour ce candidat. "
+                "Lance d'abord 'Vérifier doublons' si ce n'est pas déjà fait."
+            )
+        all_ids = self.duplicate_applicant_ids.ids + [self.id]
+        return {
+            'type': 'ir.actions.act_window',
+            'name': "Fusionner les doublons",
+            'res_model': 'hr.applicant.merge.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_applicant_ids': [(6, 0, all_ids)],
+                'default_keep_applicant_id': self.id,
+            },
+        }
+
     def action_detect_duplicates(self):
         """Recherche les candidatures similaires par email, téléphone ou nom+prénom."""
         for applicant in self:

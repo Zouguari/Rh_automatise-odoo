@@ -27,6 +27,7 @@
         'views/hr_applicant_views.xml',
         'views/hr_job_views.xml',
         'views/hr_recruitment_stage_views.xml',
+        'wizards/hr_applicant_merge_wizard_views.xml',
     ],
     'demo': [],
     'installable': True,

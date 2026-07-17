@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_applicant_merge_wizard_form" model="ir.ui.view">
+        <field name="name">hr.applicant.merge.wizard.form</field>
+        <field name="model">hr.applicant.merge.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Fusionner les candidatures en double">
+                <p>
+                    Choisis la candidature à <b>conserver</b>. Les autres seront
+                    archivées, et leurs données IA (score, résumé, compétences,
+                    CV...) seront récupérées automatiquement si la fiche
+                    conservée n'en a pas déjà.
+                </p>
+                <field name="applicant_ids" invisible="1"/>
+                <field name="keep_applicant_id" widget="radio"/>
+                <footer>
+                    <button name="action_confirm_merge" type="object"
+                            string="Fusionner" class="btn-primary"/>
+                    <button string="Annuler" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>
