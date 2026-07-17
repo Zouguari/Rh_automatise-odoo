@@ -18,6 +18,16 @@ _logger = logging.getLogger(__name__)
 GEMINI_MODEL = "gemini-flash-latest"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 
+
+class GeminiRetryableError(UserError):
+    """Erreur Gemini pour laquelle relancer la génération a une vraie chance
+    d'aboutir à un résultat différent (JSON mal formé, réponse vide...).
+    À ne pas confondre avec UserError "classique" (clé API manquante, HTTP
+    définitivement en échec, tokens dépassés) qui elle ne doit JAMAIS être
+    retentée automatiquement : réessayer produirait le même échec, en pire
+    (temps perdu, messages trompeurs)."""
+    pass
+
 EXTRACTION_PROMPT = """Tu es un assistant RH spécialisé dans l'analyse de CV.
 Analyse le texte de CV suivant et réponds UNIQUEMENT avec un objet JSON valide, sans aucun texte avant ou après, sans balises markdown.
 
@@ -276,8 +286,12 @@ class HrApplicant(models.Model):
         return self._call_gemini_json(prompt)
 
     def _post_gemini_with_retry(self, api_key, payload, max_retries=3):
-        """Appelle l'API Gemini avec retry automatique sur erreurs serveur
-        temporaires (503 surchargé, 429 quota momentané)."""
+        """Appelle l'API Gemini avec retry automatique, mais UNIQUEMENT sur
+        des erreurs réellement temporaires : problème réseau, 503 (surchargé),
+        429 (quota momentané). Les autres erreurs HTTP (401/403 clé invalide,
+        404 modèle introuvable, 400 requête malformée...) sont définitives :
+        retenter donnerait exactement le même résultat, donc on remonte
+        l'erreur immédiatement au lieu de faire perdre du temps."""
         last_error = None
         for attempt in range(max_retries):
             try:
@@ -286,7 +300,37 @@ class HrApplicant(models.Model):
                     json=payload,
                     timeout=60,
                 )
-                if response.status_code in (503, 429) and attempt < max_retries - 1:
+            except requests.exceptions.RequestException as e:
+                # Erreur réseau (timeout, DNS, connexion coupée...) : ça, c'est
+                # bien temporaire, on retente.
+                last_error = e
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)
+                    continue
+                raise UserError(
+                    f"Impossible de contacter l'API Gemini après {max_retries} "
+                    f"tentatives (problème réseau).\nDétail technique : {last_error}"
+                )
+
+            if response.status_code in (503, 429):
+                last_error = f"HTTP {response.status_code} : {response.text[:200]}"
+
+                # Un 429 peut être une surcharge momentanée (vaut le coup de
+                # réessayer) OU un quota définitivement dépassé pour la période
+                # en cours (réessayer ne sert à rien avant la remise à zéro du
+                # quota ou l'activation de la facturation). On distingue les deux.
+                if response.status_code == 429 and 'quota' in response.text.lower():
+                    raise UserError(
+                        "Le quota de l'API Gemini est dépassé (plan gratuit ou "
+                        "limite atteinte) — ce n'est PAS temporaire, réessayer "
+                        "maintenant ne changera rien.\n"
+                        "Solutions : attends la remise à zéro du quota (souvent "
+                        "quotidienne), ou active la facturation sur Google AI "
+                        "Studio pour des limites plus hautes.\n"
+                        f"Détail technique : {last_error}"
+                    )
+
+                if attempt < max_retries - 1:
                     wait = 2 ** attempt  # 1s, 2s, 4s
                     _logger.warning(
                         "Gemini indisponible (%s), nouvelle tentative dans %ss (essai %s/%s)",
@@ -294,29 +338,38 @@ class HrApplicant(models.Model):
                     )
                     time.sleep(wait)
                     continue
-                response.raise_for_status()
-                return response.json()
-            except requests.exceptions.RequestException as e:
-                last_error = e
-                if attempt < max_retries - 1:
-                    time.sleep(2 ** attempt)
-                    continue
-        raise UserError(
-            f"L'API Gemini est indisponible après {max_retries} tentatives. "
-            "C'est généralement temporaire (serveurs Google surchargés) — réessaie dans "
-            f"quelques instants.\nDétail technique : {last_error}"
-        )
+                raise UserError(
+                    f"L'API Gemini est surchargée après {max_retries} tentatives. "
+                    "C'est généralement temporaire (serveurs Google surchargés) — réessaie dans "
+                    f"quelques instants.\nDétail technique : {last_error}"
+                )
+
+            if not response.ok:
+                # Erreur définitive (mauvaise clé, modèle inconnu, requête
+                # invalide...) : inutile de retenter, on échoue tout de suite
+                # avec un message clair plutôt que de faire attendre pour rien.
+                raise UserError(
+                    f"L'API Gemini a renvoyé une erreur {response.status_code} "
+                    "(non temporaire, retenter ne changera rien).\n"
+                    f"Détail : {response.text[:300]}"
+                )
+
+            return response.json()
 
     def _call_gemini_json(self, prompt, max_attempts=3):
         """Appel générique à Gemini qui renvoie un JSON parsé. Réutilisé par extraction et scoring.
         Si le JSON renvoyé est invalide, on relance toute la génération (pas juste le parsing)
         jusqu'à max_attempts fois : c'est souvent un aléa ponctuel du modèle qui ne se
-        reproduit pas d'un essai à l'autre."""
+        reproduit pas d'un essai à l'autre.
+        Attention : seules les erreurs marquées GeminiRetryableError sont retentées ici.
+        Les autres UserError (clé API manquante, échec HTTP définitif, tokens dépassés...)
+        remontent immédiatement — les retenter ne changerait rien au résultat et ferait
+        juste perdre du temps avec un message trompeur."""
         last_error = None
         for attempt in range(max_attempts):
             try:
                 return self._call_gemini_json_once(prompt)
-            except UserError as e:
+            except GeminiRetryableError as e:
                 last_error = e
                 if attempt < max_attempts - 1:
                     _logger.warning(
@@ -367,7 +420,7 @@ class HrApplicant(models.Model):
             part.get("text", "") for part in parts if not part.get("thought")
         )
         if not text_response.strip():
-            raise UserError(
+            raise GeminiRetryableError(
                 "Gemini n'a renvoyé aucun contenu exploitable (réponse vide ou "
                 "uniquement du raisonnement interne). Consulte le champ "
                 "'Debug - Réponse brute Gemini' et réessaie."
@@ -401,7 +454,7 @@ class HrApplicant(models.Model):
                 return result
             except json.JSONDecodeError:
                 snippet = cleaned[max(0, first_error.pos - 80):first_error.pos + 80]
-                raise UserError(
+                raise GeminiRetryableError(
                     "La réponse de l'IA n'est pas un JSON valide "
                     f"({first_error.msg} à la position {first_error.pos}).\n"
                     f"Extrait autour de l'erreur : ...{snippet}...\n"

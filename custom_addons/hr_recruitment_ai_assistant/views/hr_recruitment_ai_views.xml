@@ -72,6 +72,46 @@
         </field>
     </record>
 
+    <!-- Classement des meilleurs candidats (tri par score IA décroissant) -->
+    <record id="view_hr_applicant_ranking_tree" model="ir.ui.view">
+        <field name="name">hr.applicant.ranking.tree</field>
+        <field name="model">hr.applicant</field>
+        <field name="arch" type="xml">
+            <tree string="Classement IA des candidats" create="false" default_order="ai_score desc" decoration-muted="active == False">
+                <field name="active" column_invisible="1"/>
+                <field name="partner_name" string="Candidat"/>
+                <field name="job_id" string="Poste"/>
+                <field name="stage_id" string="Étape"/>
+                <field name="user_id" string="Recruteur"/>
+                <field name="ai_score" string="Score IA (%)" widget="progressbar" options="{'max_value': 100}"/>
+                <field name="ai_recommendation" string="Recommandation" widget="badge"
+                       decoration-success="ai_recommendation == 'highly_recommended'"
+                       decoration-info="ai_recommendation == 'recommended'"
+                       decoration-warning="ai_recommendation == 'neutral'"
+                       decoration-danger="ai_recommendation == 'not_recommended'"/>
+                <field name="ai_summary" string="Résumé IA"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="action_hr_applicant_ranking" model="ir.actions.act_window">
+        <field name="name">Meilleurs candidats</field>
+        <field name="res_model">hr.applicant</field>
+        <field name="view_mode">tree,form</field>
+        <field name="view_id" ref="view_hr_applicant_ranking_tree"/>
+        <field name="domain">[('ai_score', '&gt;', 0)]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Aucun candidat évalué par l'IA pour le moment.
+            </p>
+            <p>
+                Lance le bouton "🚀 Pipeline IA complet" (ou juste "Calculer le score")
+                sur un candidat pour qu'il apparaisse ici, classé automatiquement
+                du meilleur profil au moins bon.
+            </p>
+        </field>
+    </record>
+
     <!-- Menus -->
     <menuitem id="menu_hr_recruitment_ai_root" 
               name="Assistant RH IA" 
@@ -83,4 +123,10 @@
               parent="menu_hr_recruitment_ai_root" 
               action="action_hr_recruitment_ai_generator" 
               sequence="10"/>
+
+    <menuitem id="menu_hr_applicant_ranking"
+              name="Meilleurs candidats"
+              parent="menu_hr_recruitment_ai_root"
+              action="action_hr_applicant_ranking"
+              sequence="5"/>
 </odoo>
