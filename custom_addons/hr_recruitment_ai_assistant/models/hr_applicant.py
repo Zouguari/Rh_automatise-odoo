@@ -41,10 +41,31 @@ Le JSON doit avoir exactement cette structure :
   "summary": "résumé du profil en 2-3 phrases",
   "skills": ["compétence1", "compétence2"],
   "education": ["diplôme - établissement - année"],
+  "education_level_normalized": "bac_5",
   "experience": ["poste - entreprise - période - description courte"],
   "languages": ["langue (niveau)"],
   "certifications": ["certification1"]
 }
+
+"education_level_normalized" doit être EXACTEMENT une de ces valeurs :
+"bac", "bac_2", "bac_3", "bac_5", "doctorat", "autre".
+Déduis cette valeur à partir du diplôme le PLUS ÉLEVÉ trouvé dans le CV, en
+tenant compte des équivalences du système éducatif marocain (fréquent dans
+les CV traités par ce module) :
+- "bac" : Baccalauréat marocain (toutes filières)
+- "bac_2" : DEUG, DEUST, DUT, Technicien Spécialisé (OFPPT/ISTA), BTS
+- "bac_3" : Licence, Licence Professionnelle, Licence Fondamentale
+- "bac_5" : Master, Master Spécialisé, Diplôme d'Ingénieur d'État (grandes
+  écoles marocaines : EMI, ENSA, ENSAM, ENSIAS, INPT, EHTP, ENCG, ISCAE,
+  FST, Al Akhawayn, UM6P...), MBA
+- "doctorat" : Doctorat, PhD
+- "autre" : diplôme non identifiable ou absent du CV
+Reconnais aussi les entreprises marocaines courantes (OCP Group, Maroc
+Telecom/IAM, Attijariwafa Bank, BMCE Bank of Africa, Bank Al-Maghrib, Royal
+Air Maroc, ONCF, ONEE, Marjane, Label Vie, Managem, CIH Bank, Wafa
+Assurance, Saham, LafargeHolcim Maroc, Renault Tanger, Stellantis Kenitra...)
+et transcris leur nom exact dans "experience", sans les tronquer ni les
+traduire.
 
 Si une section est absente du CV, renvoie une liste vide pour cette clé.
 Ne traduis pas le contenu, garde la langue d'origine du CV.
@@ -100,6 +121,17 @@ class HrApplicant(models.Model):
     # --- Données extraites du CV ---
     extracted_skills = fields.Text(string="Compétences extraites")
     extracted_education = fields.Text(string="Diplômes extraits")
+    extracted_education_level = fields.Selection([
+        ('bac', 'Bac'),
+        ('bac_2', 'Bac+2 (DEUG/DEUST/DUT/Technicien Spécialisé)'),
+        ('bac_3', 'Bac+3 (Licence/Licence Professionnelle)'),
+        ('bac_5', 'Bac+5 et plus (Master/Diplôme d\'Ingénieur d\'État)'),
+        ('doctorat', 'Doctorat'),
+        ('autre', 'Autre / Non déterminé'),
+    ], string="Niveau d'études (normalisé)",
+        help="Niveau standardisé déduit par l'IA à partir des diplômes extraits, "
+             "en tenant compte des équivalences du système éducatif marocain "
+             "(ex: Diplôme d'Ingénieur d'État = Bac+5).")
     extracted_experience = fields.Text(string="Expériences extraites")
     extracted_languages = fields.Text(string="Langues extraites")
     extracted_certifications = fields.Text(string="Certifications extraites")
@@ -314,22 +346,6 @@ class HrApplicant(models.Model):
 
             if response.status_code in (503, 429):
                 last_error = f"HTTP {response.status_code} : {response.text[:200]}"
-
-                # Un 429 peut être une surcharge momentanée (vaut le coup de
-                # réessayer) OU un quota définitivement dépassé pour la période
-                # en cours (réessayer ne sert à rien avant la remise à zéro du
-                # quota ou l'activation de la facturation). On distingue les deux.
-                if response.status_code == 429 and 'quota' in response.text.lower():
-                    raise UserError(
-                        "Le quota de l'API Gemini est dépassé (plan gratuit ou "
-                        "limite atteinte) — ce n'est PAS temporaire, réessayer "
-                        "maintenant ne changera rien.\n"
-                        "Solutions : attends la remise à zéro du quota (souvent "
-                        "quotidienne), ou active la facturation sur Google AI "
-                        "Studio pour des limites plus hautes.\n"
-                        f"Détail technique : {last_error}"
-                    )
-
                 if attempt < max_retries - 1:
                     wait = 2 ** attempt  # 1s, 2s, 4s
                     _logger.warning(
@@ -471,10 +487,19 @@ class HrApplicant(models.Model):
                 return ""
             return "\n".join(f"- {item}" for item in items)
 
+        # Sécurité : si Gemini renvoie une valeur hors de la liste autorisée
+        # (faute de frappe, valeur inventée...), on retombe sur 'autre' plutôt
+        # que de planter sur une écriture de champ Selection invalide.
+        allowed_levels = dict(self._fields['extracted_education_level'].selection)
+        education_level = result.get('education_level_normalized', 'autre')
+        if education_level not in allowed_levels:
+            education_level = 'autre'
+
         self.write({
             'ai_summary': result.get('summary', ''),
             'extracted_skills': _format_list(result.get('skills', [])),
             'extracted_education': _format_list(result.get('education', [])),
+            'extracted_education_level': education_level,
             'extracted_experience': _format_list(result.get('experience', [])),
             'extracted_languages': _format_list(result.get('languages', [])),
             'extracted_certifications': _format_list(result.get('certifications', [])),

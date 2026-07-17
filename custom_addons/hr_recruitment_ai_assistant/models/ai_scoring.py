@@ -22,7 +22,13 @@ Règles :
 - "score" est un entier de 0 à 100 représentant le pourcentage de correspondance globale.
 - "recommendation" doit être une de ces valeurs exactes : "highly_recommended" (score >= 80), "recommended" (score 60-79), "neutral" (score 40-59), "not_recommended" (score < 40).
 - Prends en compte les compétences équivalentes ou proches (ex: Django compte comme du Python), pas seulement les correspondances exactes de mots.
-- Prends en compte l'expérience et le niveau d'études si pertinents.
+- Prends en compte l'expérience et le niveau d'études si pertinents. Pour le
+  niveau d'études, tiens compte des équivalences marocaines : un "Diplôme
+  d'Ingénieur d'État" ou un "Master" équivalent à Bac+5, une "Licence
+  Professionnelle" à Bac+3, un "DEUST/DUT/Technicien Spécialisé" à Bac+2.
+  Le niveau normalisé du candidat (déjà déduit) est indiqué ci-dessous dans
+  "Niveau d'études (normalisé)" — utilise-le en priorité, il est plus fiable
+  qu'une comparaison de texte brut.
 
 RÈGLE DE FORMAT JSON CRITIQUE : n'utilise JAMAIS de guillemets doubles (")
 à l'intérieur du texte des valeurs (explication, compétences...). Pour citer
@@ -40,6 +46,7 @@ Résumé : {candidate_summary}
 Compétences : {candidate_skills}
 Expériences : {candidate_experience}
 Diplômes : {candidate_education}
+Niveau d'études (normalisé) : {candidate_education_level}
 """
 
 
@@ -77,6 +84,9 @@ class HrApplicant(models.Model):
             candidate_skills=self.extracted_skills or "Non renseigné",
             candidate_experience=self.extracted_experience or "Non renseigné",
             candidate_education=self.extracted_education or "Non renseigné",
+            candidate_education_level=dict(
+                self._fields['extracted_education_level'].selection
+            ).get(self.extracted_education_level, "Non déterminé"),
         )
 
         return self._call_gemini_json(prompt)

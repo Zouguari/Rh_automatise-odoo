@@ -64,6 +64,7 @@
                     <group string="Données extraites">
                         <field name="extracted_skills"/>
                         <field name="extracted_education"/>
+                        <field name="extracted_education_level"/>
                         <field name="extracted_experience"/>
                         <field name="extracted_languages"/>
                         <field name="extracted_certifications"/>
