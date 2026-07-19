@@ -73,6 +73,41 @@
     </record>
 
     <!-- Classement des meilleurs candidats (tri par score IA décroissant) -->
+    <!-- Classement des meilleurs candidats (tri par score IA décroissant) -->
+    <record id="view_hr_applicant_ranking_kanban" model="ir.ui.view">
+        <field name="name">hr.applicant.ranking.kanban</field>
+        <field name="model">hr.applicant</field>
+        <field name="arch" type="xml">
+            <kanban create="false" default_order="ai_score desc">
+                <templates>
+                    <t t-name="kanban-box">
+                        <div class="oe_kanban_global_click o_kanban_card p-3 mb-2">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <strong><field name="partner_name"/></strong>
+                            </div>
+                            <div class="text-muted small">
+                                <field name="job_id"/>
+                            </div>
+                            <div class="mt-2">
+                                <field name="ai_score" widget="progressbar" options="{'max_value': 100}"/>
+                            </div>
+                            <div class="mt-1">
+                                <field name="ai_recommendation" widget="badge"
+                                       decoration-success="ai_recommendation == 'highly_recommended'"
+                                       decoration-info="ai_recommendation == 'recommended'"
+                                       decoration-warning="ai_recommendation == 'neutral'"
+                                       decoration-danger="ai_recommendation == 'not_recommended'"/>
+                            </div>
+                            <div class="mt-2 small text-muted">
+                                <field name="ai_summary"/>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
     <record id="view_hr_applicant_ranking_tree" model="ir.ui.view">
         <field name="name">hr.applicant.ranking.tree</field>
         <field name="model">hr.applicant</field>
@@ -97,8 +132,11 @@
     <record id="action_hr_applicant_ranking" model="ir.actions.act_window">
         <field name="name">Meilleurs candidats</field>
         <field name="res_model">hr.applicant</field>
-        <field name="view_mode">tree,form</field>
-        <field name="view_id" ref="view_hr_applicant_ranking_tree"/>
+        <field name="view_mode">kanban,tree,form</field>
+        <field name="view_ids" eval="[
+            (0, 0, {'view_mode': 'kanban', 'view_id': ref('view_hr_applicant_ranking_kanban')}),
+            (0, 0, {'view_mode': 'tree', 'view_id': ref('view_hr_applicant_ranking_tree')}),
+        ]"/>
         <field name="domain">[('ai_score', '&gt;', 0)]</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
