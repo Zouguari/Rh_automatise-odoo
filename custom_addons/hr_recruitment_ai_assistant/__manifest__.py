@@ -24,6 +24,7 @@
         'data/ir_config_parameter_data.xml',
         'data/mail_templates.xml',
         'views/hr_recruitment_ai_views.xml',
+        'views/hr_recruitment_ai_settings_views.xml',
         'views/hr_applicant_views.xml',
         'views/hr_recruitment_stage_views.xml',
         'wizards/hr_applicant_merge_wizard_views.xml',

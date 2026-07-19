@@ -2,3 +2,4 @@ id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_hr_recruitment_ai_generator,access.hr.recruitment.ai.generator,model_hr_recruitment_ai_generator,base.group_user,1,1,1,1
 access_hr_applicant_merge_wizard,access.hr.applicant.merge.wizard,model_hr_applicant_merge_wizard,base.group_user,1,1,1,1
 access_hr_applicant_bulk_import_wizard,access.hr.applicant.bulk.import.wizard,model_hr_applicant_bulk_import_wizard,base.group_user,1,1,1,1
+access_hr_recruitment_ai_settings,access.hr.recruitment.ai.settings,model_hr_recruitment_ai_settings,base.group_user,1,1,1,1

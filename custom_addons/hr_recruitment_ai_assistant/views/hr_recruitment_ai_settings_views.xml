@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_recruitment_ai_settings_form" model="ir.ui.view">
+        <field name="name">hr.recruitment.ai.settings.form</field>
+        <field name="model">hr.recruitment.ai.settings</field>
+        <field name="arch" type="xml">
+            <form string="Configuration de l'Assistant RH IA">
+                <p>
+                    Configure ici la clé API Gemini utilisée par toutes les
+                    fonctionnalités IA du module (extraction de CV, scoring,
+                    questions d'entretien, suggestion de poste...).
+                </p>
+                <group>
+                    <field name="gemini_api_key" password="True"/>
+                </group>
+                <p class="text-muted">
+                    Astuce : clique sur "Tester la connexion" après avoir
+                    collé ta clé, avant d'enregistrer, pour vérifier qu'elle
+                    fonctionne réellement.
+                </p>
+                <footer>
+                    <button name="action_test_connection" type="object"
+                            string="Tester la connexion" class="btn-secondary"/>
+                    <button name="action_save" type="object"
+                            string="Enregistrer" class="btn-primary"/>
+                    <button string="Fermer" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_hr_recruitment_ai_settings" model="ir.actions.act_window">
+        <field name="name">Configuration IA</field>
+        <field name="res_model">hr.recruitment.ai.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_hr_recruitment_ai_settings"
+              name="Configuration IA"
+              parent="menu_hr_recruitment_ai_root"
+              action="action_hr_recruitment_ai_settings"
+              sequence="20"/>
+</odoo>

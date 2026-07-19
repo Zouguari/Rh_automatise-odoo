@@ -134,6 +134,7 @@
         <field name="res_model">hr.applicant</field>
         <field name="view_mode">kanban,tree,form</field>
         <field name="view_ids" eval="[
+            (5, 0, 0),
             (0, 0, {'view_mode': 'kanban', 'view_id': ref('view_hr_applicant_ranking_kanban')}),
             (0, 0, {'view_mode': 'tree', 'view_id': ref('view_hr_applicant_ranking_tree')}),
         ]"/>
