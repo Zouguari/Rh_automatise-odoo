@@ -60,36 +60,46 @@
                             <field name="ai_recommendation"/>
                             <field name="ai_score_explanation" placeholder="Explication du score..."/>
                         </group>
-                        <group string="Compétences">
+                        <group string="Analyse des compétences">
                             <field name="ai_matched_skills" readonly="1"/>
                             <field name="ai_missing_skills" readonly="1"/>
                         </group>
-                        <group string="Doublons">
-                            <field name="is_potential_duplicate"/>
-                            <field name="duplicate_applicant_ids" widget="many2many_tags"
-                                   options="{'no_create': True}"/>
+                    </group>
+
+                    <group string="Résumé du CV">
+                        <field name="ai_summary" nolabel="1" colspan="2" placeholder="Résumé automatique du CV..."/>
+                    </group>
+
+                    <group string="Entretien &amp; Questions IA">
+                        <field name="interview_event_id"/>
+                        <field name="ai_interview_questions" placeholder="Questions d'entretien..." readonly="1" colspan="2"/>
+                    </group>
+
+                    <group string="Données extraites du CV">
+                        <group string="Formation &amp; Langues">
+                            <field name="extracted_education_level"/>
+                            <field name="extracted_education"/>
+                            <field name="extracted_languages"/>
+                            <field name="extracted_certifications"/>
+                        </group>
+                        <group string="Expérience &amp; Compétences">
+                            <field name="extracted_skills"/>
+                            <field name="extracted_experience"/>
                         </group>
                     </group>
-                    <group string="Résumé">
-                        <field name="ai_summary" nolabel="1"/>
+
+                    <group string="Gestion des doublons" invisible="not is_potential_duplicate">
+                        <field name="is_potential_duplicate"/>
+                        <field name="duplicate_applicant_ids" widget="many2many_tags"
+                               options="{'no_create': True}"/>
                     </group>
-                    <group string="Entretien">
-                        <field name="interview_event_id"/>
-                        <field name="ai_interview_questions" placeholder="Questions d'entretien..." readonly="1"/>
-                    </group>
-                    <group string="Données extraites">
-                        <field name="extracted_skills"/>
-                        <field name="extracted_education"/>
-                        <field name="extracted_education_level"/>
-                        <field name="extracted_experience"/>
-                        <field name="extracted_languages"/>
-                        <field name="extracted_certifications"/>
-                    </group>
+                </page>
+                <page string="Debug / Technique" name="ai_debug" groups="base.group_no_one">
                     <group string="Texte brut du CV">
-                        <field name="cv_raw_text" nolabel="1" readonly="1"/>
+                        <field name="cv_raw_text" nolabel="1" colspan="2" readonly="1"/>
                     </group>
                     <group string="Debug - Réponse brute Gemini">
-                        <field name="ai_extraction_raw" nolabel="1" readonly="1"/>
+                        <field name="ai_extraction_raw" nolabel="1" colspan="2" readonly="1"/>
                     </group>
                 </page>
                 <page string="Historique des scores" name="score_history">
