@@ -56,6 +56,10 @@ class HrApplicant(models.Model):
     ai_matched_skills = fields.Text(string="Compétences correspondantes")
     ai_missing_skills = fields.Text(string="Compétences manquantes")
     ai_score_explanation = fields.Text(string="Justification du score")
+    score_history_ids = fields.One2many(
+        'hr.applicant.score.history', 'applicant_id',
+        string="Historique des scores"
+    )
 
     def action_compute_match_score(self):
         for applicant in self:
@@ -97,10 +101,26 @@ class HrApplicant(models.Model):
         def _format_list(items):
             return "\n".join(f"- {item}" for item in items) if items else ""
 
+        matched = _format_list(result.get('matched_skills', []))
+        missing = _format_list(result.get('missing_skills', []))
+
         self.write({
             'ai_score': result.get('score', 0),
             'ai_recommendation': result.get('recommendation', 'neutral'),
             'ai_score_explanation': result.get('explanation', ''),
-            'ai_matched_skills': _format_list(result.get('matched_skills', [])),
-            'ai_missing_skills': _format_list(result.get('missing_skills', [])),
+            'ai_matched_skills': matched,
+            'ai_missing_skills': missing,
+        })
+
+        # Garde une trace de ce résultat, même si le score est recalculé
+        # plus tard — utile pour justifier une décision de recrutement
+        # après coup, ou comparer l'évolution d'un profil dans le temps.
+        self.env['hr.applicant.score.history'].create({
+            'applicant_id': self.id,
+            'job_id': self.job_id.id,
+            'score': result.get('score', 0),
+            'recommendation': result.get('recommendation', 'neutral'),
+            'explanation': result.get('explanation', ''),
+            'matched_skills': matched,
+            'missing_skills': missing,
         })

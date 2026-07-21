@@ -92,6 +92,22 @@
                         <field name="ai_extraction_raw" nolabel="1" readonly="1"/>
                     </group>
                 </page>
+                <page string="Historique des scores" name="score_history">
+                    <field name="score_history_ids" readonly="1">
+                        <tree string="Historique des scores" create="false" edit="false" delete="false">
+                            <field name="create_date" string="Date"/>
+                            <field name="job_id" string="Poste"/>
+                            <field name="score" string="Score (%)" widget="progressbar" options="{'max_value': 100}"/>
+                            <field name="recommendation" widget="badge"
+                                   decoration-success="recommendation == 'highly_recommended'"
+                                   decoration-info="recommendation == 'recommended'"
+                                   decoration-warning="recommendation == 'neutral'"
+                                   decoration-danger="recommendation == 'not_recommended'"/>
+                            <field name="computed_by" string="Par"/>
+                            <field name="explanation" string="Justification"/>
+                        </tree>
+                    </field>
+                </page>
                 <page string="Onboarding" name="onboarding" invisible="not emp_id">
                     <group string="Contrat">
                         <field name="generated_contract_id"/>
