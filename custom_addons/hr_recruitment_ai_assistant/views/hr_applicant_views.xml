@@ -14,11 +14,8 @@
                         confirm="Ceci va enchaîner automatiquement : extraction du CV, analyse IA, calcul du score et génération des questions d'entretien. Continuer ?"/>
                 <button name="action_reset_ai_processing" type="object"
                         string="Relancer analyse IA" class="btn-secondary"/>
-                <button name="action_extract_cv_text" type="object"
-                        string="Extraire texte du CV" class="btn-primary"/>
                 <button name="action_ai_extract_structured_data" type="object"
-                        string="Analyser avec l'IA" class="btn-primary"
-                        invisible="cv_extraction_state != 'extracted'"/>
+                        string="Analyser avec l'IA" class="btn-primary"/>
                 <button name="action_detect_duplicates" type="object"
                         string="Vérifier doublons" class="btn-secondary"/>
                 <button name="action_open_merge_wizard" type="object"

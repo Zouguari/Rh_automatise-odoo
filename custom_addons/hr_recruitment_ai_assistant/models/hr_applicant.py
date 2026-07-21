@@ -301,7 +301,7 @@ class HrApplicant(models.Model):
         """Appelle Gemini pour extraire les données structurées du CV."""
         for applicant in self:
             if not applicant.cv_raw_text:
-                raise UserError("Aucun texte de CV disponible. Lance d'abord l'extraction du CV.")
+                applicant.action_extract_cv_text()
 
             applicant.ai_processing_state = 'processing'
             try:
