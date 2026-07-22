@@ -11,6 +11,8 @@
                 </group>
                 <group string="Automatisation entretien IA">
                     <field name="is_interview_stage"/>
+                    <field name="interview_type" invisible="not is_interview_stage"
+                           required="is_interview_stage"/>
                 </group>
             </xpath>
         </field>

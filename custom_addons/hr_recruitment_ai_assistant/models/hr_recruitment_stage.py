@@ -18,3 +18,11 @@ class HrRecruitmentStage(models.Model):
              "Remplace une ancienne logique basée sur le nom de l'étape (peu fiable "
              "si l'étape est renommée ou si Odoo est utilisé dans une autre langue)."
     )
+    interview_type = fields.Selection([
+        ('rh', 'Entretien RH'),
+        ('technique', 'Entretien Technique'),
+    ], string="Type d'entretien",
+        help="Précise la nature de l'entretien pour cette étape (utilisé dans "
+             "l'email de convocation envoyé au candidat, et pour adapter le "
+             "contenu généré par l'IA). Laisse vide si cette étape n'est pas "
+             "un entretien.")
