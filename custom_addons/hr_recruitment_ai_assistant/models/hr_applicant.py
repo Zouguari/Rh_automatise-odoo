@@ -650,6 +650,67 @@ class HrApplicant(models.Model):
             })
 
             applicant.interview_event_id = event.id
+            applicant._send_interview_invitation_email()
+
+    def _send_interview_invitation_email(self):
+        """Envoie au candidat un email de convocation précisant le type
+        d'entretien (RH/Technique), la date/heure, et l'interviewer.
+        Appelé juste après la création de l'événement calendrier — c'est
+        volontairement séparé de l'email générique par étape
+        (_send_stage_automatic_email), qui se déclenche trop tôt (avant que
+        l'événement et sa date n'existent)."""
+        self.ensure_one()
+        if not self.email_from:
+            _logger.warning(
+                "Email de convocation non envoyé pour %s : aucune adresse "
+                "email connue sur cette candidature.", self.partner_name,
+            )
+            return
+        if not self.interview_event_id:
+            return
+
+        interview_type_label = dict(
+            self.stage_id._fields['interview_type'].selection
+        ).get(self.stage_id.interview_type, "Entretien")
+
+        event = self.interview_event_id
+        date_str = fields.Datetime.context_timestamp(
+            self, event.start
+        ).strftime('%d/%m/%Y à %H:%M')
+
+        interviewer_names = ", ".join(self.interviewer_ids.mapped('name'))
+        if not interviewer_names:
+            interviewer_names = self.user_id.name or "à confirmer prochainement"
+
+        job_name = self.job_id.name if self.job_id else "notre entreprise"
+        subject = f"{interview_type_label} — Candidature {job_name}"
+        body_html = f"""
+            <p>Bonjour {self.partner_name or ''},</p>
+            <p>Nous avons le plaisir de vous convier à un entretien dans le cadre
+            de votre candidature{" au poste de " + job_name if self.job_id else ""}.</p>
+            <ul>
+                <li><strong>Type d'entretien :</strong> {interview_type_label}</li>
+                <li><strong>Date et heure :</strong> {date_str}</li>
+                <li><strong>Avec :</strong> {interviewer_names}</li>
+            </ul>
+            <p>Merci de confirmer votre disponibilité en répondant à cet email.
+            N'hésitez pas à nous contacter si ce créneau ne vous convient pas.</p>
+            <p>Cordialement,<br/>L'équipe recrutement</p>
+        """
+
+        self.env['mail.mail'].sudo().create({
+            'subject': subject,
+            'body_html': body_html,
+            'email_to': self.email_from,
+            'auto_delete': True,
+        }).send()
+
+        self.message_post(
+            body=(
+                f"Email de convocation envoyé au candidat : {interview_type_label}, "
+                f"le {date_str}, avec {interviewer_names}."
+            )
+        )
 
     def create_employee_from_applicant(self):
         # Appelle le comportement natif d'Odoo (crée hr.employee, lie applicant à employee_id)
