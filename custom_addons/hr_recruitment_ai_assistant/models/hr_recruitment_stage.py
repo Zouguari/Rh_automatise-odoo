@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
-from odoo import models, fields
+from odoo import models, fields, api
+from odoo.exceptions import ValidationError
 
 
 class HrRecruitmentStage(models.Model):
@@ -47,3 +48,27 @@ class HrRecruitmentStage(models.Model):
              "signé côté RH : cette automatisation est irréversible en un "
              "clic (création employé + validation contrat)."
     )
+
+    @api.constrains('is_interview_stage', 'is_refusal_stage', 'is_contract_signed_stage')
+    def _check_single_automatic_role(self):
+        """Empêche de cocher plusieurs rôles automatiques contradictoires sur
+        la même étape (ex: une étape marquée à la fois 'Entretien' et
+        'Contrat signé' déclencherait planification d'entretien ET
+        signature de contrat au même moment, ce qui n'a pas de sens
+        métier). Chaque étape ne doit avoir qu'un seul rôle automatique
+        actif à la fois."""
+        for stage in self:
+            active_roles = sum([
+                stage.is_interview_stage,
+                stage.is_refusal_stage,
+                stage.is_contract_signed_stage,
+            ])
+            if active_roles > 1:
+                raise ValidationError(
+                    f"L'étape « {stage.name} » ne peut pas cumuler plusieurs "
+                    "rôles automatiques (Entretien / Refus / Contrat signé). "
+                    "Choisis-en un seul par étape pour éviter des "
+                    "déclenchements contradictoires (ex: envoi d'une "
+                    "convocation d'entretien ET signature de contrat en "
+                    "même temps)."
+                )

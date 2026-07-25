@@ -660,16 +660,22 @@ class HrApplicant(models.Model):
     def _handle_interview_stage(self):
         self.ensure_one()
         if self.stage_id.is_interview_stage:
-            if not self.ai_interview_questions:
+            # Une nouvelle étape d'entretien (RH puis Technique) doit
+            # regénérer ses PROPRES questions (adaptées à interview_type)
+            # et sa propre convocation — pas réutiliser celles de l'étape
+            # précédente. Avant ce correctif, les questions n'étaient
+            # générées qu'une seule fois pour tout le pipeline via
+            # "if not self.ai_interview_questions", donc l'entretien
+            # Technique héritait à tort des questions RH. Même logique de
+            # comparaison que pour interview_event_id (bug du 25/07/2026) :
+            # un entretien déjà planifié pour une étape précédente ne
+            # couvre pas les étapes suivantes.
+            needs_new_interview = (
+                not self.interview_event_id
+                or self.last_scheduled_interview_stage_id != self.stage_id
+            )
+            if needs_new_interview:
                 self.action_generate_interview_questions()
-            # Un entretien déjà planifié pour une étape précédente (ex: RH)
-            # ne couvre pas les étapes suivantes (ex: Technique) : on
-            # replanifie et reconvoque dès que l'étape d'entretien courante
-            # diffère de celle pour laquelle la dernière convocation a été
-            # envoyée. Bug corrigé le 25/07/2026 : sans cette comparaison,
-            # aucun email n'était envoyé pour le 2e entretien (Technique).
-            if (not self.interview_event_id
-                    or self.last_scheduled_interview_stage_id != self.stage_id):
                 self.action_schedule_interview()
 
     def _handle_contract_signed_stage(self):
