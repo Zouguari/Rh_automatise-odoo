@@ -26,3 +26,24 @@ class HrRecruitmentStage(models.Model):
              "l'email de convocation envoyé au candidat, et pour adapter le "
              "contenu généré par l'IA). Laisse vide si cette étape n'est pas "
              "un entretien.")
+    is_refusal_stage = fields.Boolean(
+        string="Étape de refus",
+        help="Coche cette case sur l'étape 'Refusé' (ou équivalent) du pipeline. "
+             "Quand un candidat est refusé via l'assistant de refus, il est "
+             "déplacé automatiquement vers cette étape plutôt que simplement "
+             "archivé, pour garder une trace visible dans le pipeline ATS. "
+             "Si aucune étape n'est marquée ainsi, le candidat est archivé "
+             "(comportement standard Odoo).",
+    )
+    is_contract_signed_stage = fields.Boolean(
+        string="Étape de contrat signé",
+        help="Coche cette case sur l'étape représentant un contrat réellement "
+             "signé (ex: 'Contrat signé'). Dès qu'un candidat atteint cette "
+             "étape, le module crée automatiquement son employé (si pas déjà "
+             "fait), génère le contrat, et le fait passer à l'état 'En cours' "
+             "— ce qui déclenche aussi l'email d'acceptation au candidat. "
+             "Ne coche cette case que sur une étape que le recruteur ne "
+             "déplace un candidat vers elle qu'une fois le contrat réellement "
+             "signé côté RH : cette automatisation est irréversible en un "
+             "clic (création employé + validation contrat)."
+    )

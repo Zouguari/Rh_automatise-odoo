@@ -613,6 +613,7 @@ class HrApplicant(models.Model):
             for applicant in self:
                 applicant._send_stage_automatic_email()
                 applicant._handle_interview_stage()
+                applicant._handle_contract_signed_stage()
         if vals.get('refuse_reason_id'):
             for applicant in self:
                 applicant._send_refusal_email()
@@ -670,6 +671,53 @@ class HrApplicant(models.Model):
             if (not self.interview_event_id
                     or self.last_scheduled_interview_stage_id != self.stage_id):
                 self.action_schedule_interview()
+
+    def _handle_contract_signed_stage(self):
+        """Automatise la suite complète "embauche" dès que le candidat
+        atteint une étape marquée is_contract_signed_stage : création de
+        l'employé (si pas déjà fait), génération du contrat, puis
+        validation du contrat (état 'En cours'). Cette dernière étape
+        déclenche à son tour l'email d'acceptation via hr_contract.py.
+        Avant cette automatisation, il fallait cliquer sur "Créer un
+        employé" PUIS aller changer manuellement l'état du contrat dans
+        l'app Employés — source d'oublis et d'emails d'acceptation jamais
+        envoyés."""
+        self.ensure_one()
+        if not self.stage_id.is_contract_signed_stage:
+            return
+
+        if not self.emp_id:
+            try:
+                self.create_employee_from_applicant()
+            except Exception as e:
+                _logger.error(
+                    "Création automatique de l'employé impossible pour %s : %s",
+                    self.partner_name, e,
+                )
+                self.message_post(
+                    body=(
+                        "⚠️ Création automatique de l'employé impossible à "
+                        f"cette étape : {e}\nÀ finaliser manuellement via le "
+                        "bouton « Créer un employé »."
+                    )
+                )
+                return
+
+        if self.generated_contract_id and self.generated_contract_id.state != 'open':
+            try:
+                self.generated_contract_id.write({'state': 'open'})
+            except Exception as e:
+                _logger.error(
+                    "Validation automatique du contrat impossible pour %s : %s",
+                    self.partner_name, e,
+                )
+                self.message_post(
+                    body=(
+                        "⚠️ Validation automatique du contrat impossible : "
+                        f"{e}\nÀ finaliser manuellement depuis la fiche du "
+                        "contrat (app Employés > Contrats)."
+                    )
+                )
 
     def action_schedule_interview(self):
         """Crée un événement calendrier pour l'entretien, planifié le lendemain à 10h par défaut."""
@@ -837,6 +885,7 @@ class HrApplicant(models.Model):
             'employee_id': self.emp_id.id,
             'job_id': self.job_id.id,
             'wage': self.salary_proposed or self.salary_expected or 0.0,
+            'date_start': fields.Date.context_today(self),
             'state': 'draft',
         })
         self.generated_contract_id = contract.id
