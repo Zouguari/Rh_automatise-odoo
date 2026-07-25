@@ -606,6 +606,35 @@ class HrApplicant(models.Model):
                 applicant._handle_interview_stage()
         return result
 
+    def _send_email_safely(self, subject, body_html, log_success, log_failure_prefix):
+        """Envoie un email et trace le résultat RÉEL dans le chatter (succès
+        ou échec), au lieu de supposer que ça a marché. mail.mail.send()
+        avale les erreurs par défaut (raise_exception=False) : sans ce
+        wrapper, un échec d'envoi (SMTP mal configuré, adresse invalide...)
+        passerait totalement inaperçu."""
+        self.ensure_one()
+        if not self.email_from:
+            _logger.warning(
+                "Email non envoyé pour %s : aucune adresse email connue.",
+                self.partner_name,
+            )
+            return False
+
+        mail = self.env['mail.mail'].sudo().create({
+            'subject': subject,
+            'body_html': body_html,
+            'email_to': self.email_from,
+            'auto_delete': True,
+        })
+        try:
+            mail.send(raise_exception=True)
+            self.message_post(body=log_success)
+            return True
+        except Exception as e:
+            _logger.error("%s pour %s : %s", log_failure_prefix, self.partner_name, e)
+            self.message_post(body=f"⚠️ {log_failure_prefix} : {e}")
+            return False
+
     def _send_stage_automatic_email(self):
         self.ensure_one()
         if not self.email_from:
@@ -698,18 +727,14 @@ class HrApplicant(models.Model):
             <p>Cordialement,<br/>L'équipe recrutement</p>
         """
 
-        self.env['mail.mail'].sudo().create({
-            'subject': subject,
-            'body_html': body_html,
-            'email_to': self.email_from,
-            'auto_delete': True,
-        }).send()
-
-        self.message_post(
-            body=(
+        self._send_email_safely(
+            subject=subject,
+            body_html=body_html,
+            log_success=(
                 f"Email de convocation envoyé au candidat : {interview_type_label}, "
                 f"le {date_str}, avec {interviewer_names}."
-            )
+            ),
+            log_failure_prefix="Échec de l'envoi de l'email de convocation",
         )
 
     def create_employee_from_applicant(self):
