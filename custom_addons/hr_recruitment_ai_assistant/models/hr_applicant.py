@@ -90,6 +90,15 @@ class HrApplicant(models.Model):
         'calendar.event',
         string="Entretien planifié"
     )
+    last_scheduled_interview_stage_id = fields.Many2one(
+        'hr.recruitment.stage',
+        string="Étape de la dernière convocation envoyée",
+        help="Mémorise pour quelle étape (RH, Technique...) le dernier "
+             "entretien a été planifié, afin de permettre une nouvelle "
+             "planification/convocation à chaque nouvelle étape d'entretien "
+             "plutôt que de considérer qu'un entretien déjà planifié "
+             "couvre toutes les étapes suivantes."
+    )
     ai_interview_questions = fields.Text(
         string="Questions d'entretien générées"
     )
@@ -604,6 +613,9 @@ class HrApplicant(models.Model):
             for applicant in self:
                 applicant._send_stage_automatic_email()
                 applicant._handle_interview_stage()
+        if vals.get('refuse_reason_id'):
+            for applicant in self:
+                applicant._send_refusal_email()
         return result
 
     def _send_email_safely(self, subject, body_html, log_success, log_failure_prefix):
@@ -649,14 +661,25 @@ class HrApplicant(models.Model):
         if self.stage_id.is_interview_stage:
             if not self.ai_interview_questions:
                 self.action_generate_interview_questions()
-            if not self.interview_event_id:
+            # Un entretien déjà planifié pour une étape précédente (ex: RH)
+            # ne couvre pas les étapes suivantes (ex: Technique) : on
+            # replanifie et reconvoque dès que l'étape d'entretien courante
+            # diffère de celle pour laquelle la dernière convocation a été
+            # envoyée. Bug corrigé le 25/07/2026 : sans cette comparaison,
+            # aucun email n'était envoyé pour le 2e entretien (Technique).
+            if (not self.interview_event_id
+                    or self.last_scheduled_interview_stage_id != self.stage_id):
                 self.action_schedule_interview()
 
     def action_schedule_interview(self):
         """Crée un événement calendrier pour l'entretien, planifié le lendemain à 10h par défaut."""
         for applicant in self:
-            if applicant.interview_event_id:
-                raise UserError("Un entretien est déjà planifié pour ce candidat.")
+            if (applicant.interview_event_id
+                    and applicant.last_scheduled_interview_stage_id == applicant.stage_id):
+                raise UserError(
+                    "Un entretien est déjà planifié pour ce candidat à "
+                    f"l'étape « {applicant.stage_id.name} »."
+                )
 
             start = fields.Datetime.now() + timedelta(days=1)
             start = start.replace(hour=10, minute=0, second=0)
@@ -679,6 +702,7 @@ class HrApplicant(models.Model):
             })
 
             applicant.interview_event_id = event.id
+            applicant.last_scheduled_interview_stage_id = applicant.stage_id.id
             applicant._send_interview_invitation_email()
 
     def _send_interview_invitation_email(self):
@@ -735,6 +759,63 @@ class HrApplicant(models.Model):
                 f"le {date_str}, avec {interviewer_names}."
             ),
             log_failure_prefix="Échec de l'envoi de l'email de convocation",
+        )
+
+    def _send_refusal_email(self):
+        """Envoie un email de refus avec motif explicite au candidat.
+        Déclenché automatiquement dès que refuse_reason_id est renseigné
+        (champ standard Odoo, rempli via le bouton "Refuser")."""
+        self.ensure_one()
+        reason_label = self.refuse_reason_id.name if self.refuse_reason_id else "non précisé"
+        job_name = self.job_id.name if self.job_id else "notre entreprise"
+
+        subject = f"Réponse à votre candidature — {job_name}"
+        body_html = f"""
+            <p>Bonjour {self.partner_name or ''},</p>
+            <p>Nous vous remercions pour l'intérêt que vous avez porté à notre
+            entreprise et pour le temps consacré à votre candidature
+            {"au poste de " + job_name if self.job_id else ""}.</p>
+            <p>Après étude attentive de votre profil, nous sommes au regret
+            de vous informer que nous ne donnerons pas suite à votre
+            candidature.</p>
+            <p><strong>Motif :</strong> {reason_label}</p>
+            <p>Nous vous souhaitons une pleine réussite dans vos recherches
+            et conservons votre profil pour de futures opportunités
+            correspondant à votre parcours.</p>
+            <p>Cordialement,<br/>L'équipe recrutement</p>
+        """
+
+        self._send_email_safely(
+            subject=subject,
+            body_html=body_html,
+            log_success=f"Email de refus envoyé au candidat (motif : {reason_label}).",
+            log_failure_prefix="Échec de l'envoi de l'email de refus",
+        )
+
+    def _send_acceptance_email(self):
+        """Envoie un email de félicitations/acceptation au candidat.
+        Déclenché automatiquement quand son contrat généré passe à l'état
+        "En cours" (signé/validé) — voir models/hr_contract.py."""
+        self.ensure_one()
+        job_name = self.job_id.name if self.job_id else "notre entreprise"
+
+        subject = f"Félicitations — Votre candidature « {job_name} » est acceptée !"
+        body_html = f"""
+            <p>Bonjour {self.partner_name or ''},</p>
+            <p>Nous avons le plaisir de vous confirmer que votre candidature
+            {"au poste de " + job_name if self.job_id else ""} a été retenue
+            et que votre contrat est désormais validé.</p>
+            <p>Toute l'équipe se réjouit de vous accueillir prochainement.
+            Vous recevrez très prochainement les informations pratiques pour
+            votre intégration (matériel, accès, journée d'accueil...).</p>
+            <p>Bienvenue parmi nous !<br/>L'équipe RH</p>
+        """
+
+        self._send_email_safely(
+            subject=subject,
+            body_html=body_html,
+            log_success="Email de félicitations/acceptation envoyé au candidat.",
+            log_failure_prefix="Échec de l'envoi de l'email d'acceptation",
         )
 
     def create_employee_from_applicant(self):

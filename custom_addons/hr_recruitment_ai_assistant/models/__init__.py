@@ -10,3 +10,4 @@ from . import ai_job_matching
 from . import hr_recruitment_stage
 from . import ai_interview
 from . import project_task
+from . import hr_contract
