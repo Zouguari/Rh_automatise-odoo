@@ -877,9 +877,46 @@ class HrApplicant(models.Model):
         result = super(HrApplicant, self).create_employee_from_applicant()
         for applicant in self:
             if applicant.emp_id:
+                applicant._ensure_employee_department()
                 applicant._generate_onboarding_contract()
                 applicant._create_onboarding_tasks()
         return result
+
+    def _ensure_employee_department(self):
+        """Garantit que l'employé créé depuis ce candidat est bien rattaché
+        au département du poste concerné (hr.job.department_id), plutôt
+        que de supposer que le comportement natif d'Odoo l'a déjà fait
+        correctement (il peut être absent si le poste a été modifié après
+        la candidature, ou vide selon la configuration)."""
+        self.ensure_one()
+        if not self.emp_id or not self.job_id:
+            return
+
+        job_department = self.job_id.department_id
+        if not job_department:
+            _logger.warning(
+                "Impossible de rattacher %s à un département : aucun "
+                "département défini sur le poste « %s ».",
+                self.emp_id.name, self.job_id.name,
+            )
+            self.message_post(
+                body=(
+                    f"⚠️ Employé créé sans département : le poste "
+                    f"« {self.job_id.name} » n'a aucun département "
+                    "configuré. Rattache-le manuellement."
+                )
+            )
+            return
+
+        if self.emp_id.department_id != job_department:
+            self.emp_id.department_id = job_department.id
+            self.message_post(
+                body=(
+                    f"Employé rattaché automatiquement au département "
+                    f"« {job_department.name} » (d'après le poste "
+                    f"« {self.job_id.name} »)."
+                )
+            )
 
     def _generate_onboarding_contract(self):
         self.ensure_one()
