@@ -42,6 +42,10 @@
             <!-- Nouvel onglet dédié à l'IA -->
             <xpath expr="//notebook" position="inside">
                 <page string="Analyse IA" name="ai_analysis">
+                    <div class="alert alert-secondary" role="alert" invisible="not refuse_reason_id">
+                        <strong>❌ Candidature refusée</strong> — Motif :
+                        <field name="refuse_reason_id" readonly="1" class="oe_inline"/>
+                    </div>
                     <div class="alert alert-warning" role="alert" invisible="not is_potential_duplicate">
                         <strong>⚠️ Doublon potentiel détecté</strong> — ce candidat correspond peut-être à une candidature existante.
                     </div>
@@ -68,8 +72,13 @@
                     </group>
 
                     <group string="Entretien &amp; Questions IA">
-                        <field name="interview_event_id"/>
-                        <field name="ai_interview_questions" placeholder="Questions d'entretien..." readonly="1" colspan="2"/>
+                        <field name="interview_ids" nolabel="1" colspan="2">
+                            <tree editable="false">
+                                <field name="name"/>
+                                <field name="calendar_event_id"/>
+                                <field name="questions"/>
+                            </tree>
+                        </field>
                     </group>
 
                     <group string="Données extraites du CV">

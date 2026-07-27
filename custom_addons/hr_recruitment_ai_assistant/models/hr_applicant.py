@@ -102,6 +102,15 @@ class HrApplicant(models.Model):
     ai_interview_questions = fields.Text(
         string="Questions d'entretien générées"
     )
+    interview_ids = fields.One2many(
+        'hr.applicant.interview', 'applicant_id',
+        string="Historique des entretiens",
+        help="Un enregistrement distinct par entretien planifié (RH, "
+             "Technique...), pour garder une trace de chacun séparément — "
+             "contrairement à interview_event_id / ai_interview_questions "
+             "ci-dessus, qui ne pointent que vers le DERNIER entretien "
+             "planifié."
+    )
 
     onboarding_task_ids = fields.One2many(
         'project.task', 'applicant_origin_id',
@@ -745,8 +754,15 @@ class HrApplicant(models.Model):
                 for interviewer in applicant.interviewer_ids:
                     attendees.append((4, interviewer.partner_id.id))
 
+            interview_type_label = dict(
+                applicant.stage_id._fields['interview_type'].selection
+            ).get(applicant.stage_id.interview_type, "Entretien")
+
             event = self.env['calendar.event'].create({
-                'name': f"Entretien - {applicant.partner_name} - {applicant.job_id.name}",
+                'name': (
+                    f"{interview_type_label} - {applicant.partner_name} "
+                    f"- {applicant.job_id.name}"
+                ),
                 'start': start,
                 'stop': stop,
                 'partner_ids': attendees,
@@ -757,6 +773,12 @@ class HrApplicant(models.Model):
 
             applicant.interview_event_id = event.id
             applicant.last_scheduled_interview_stage_id = applicant.stage_id.id
+            self.env['hr.applicant.interview'].create({
+                'applicant_id': applicant.id,
+                'stage_id': applicant.stage_id.id,
+                'calendar_event_id': event.id,
+                'questions': applicant.ai_interview_questions,
+            })
             applicant._send_interview_invitation_email()
 
     def _send_interview_invitation_email(self):
