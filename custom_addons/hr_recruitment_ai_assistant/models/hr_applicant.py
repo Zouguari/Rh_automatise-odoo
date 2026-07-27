@@ -626,7 +626,35 @@ class HrApplicant(models.Model):
         if vals.get('refuse_reason_id'):
             for applicant in self:
                 applicant._send_refusal_email()
+                applicant._move_to_refusal_stage()
         return result
+
+    def _move_to_refusal_stage(self):
+        """Déplace le candidat vers l'étape marquée is_refusal_stage (si une
+        telle étape est configurée), pour garder une trace visible du refus
+        dans le pipeline ATS plutôt que de le laisser simplement archivé.
+        Le refus natif Odoo archive le candidat (active=False) au même
+        moment que refuse_reason_id est renseigné — sans réactivation, le
+        déplacement d'étape ci-dessous fonctionnerait bien en base mais
+        resterait invisible dans le Kanban standard, qui masque les
+        enregistrements archivés quelle que soit leur étape. Sans étape
+        dédiée configurée, ne fait rien (comportement natif Odoo :
+        archivage seul, candidat visible uniquement via le filtre
+        "Archivé")."""
+        self.ensure_one()
+        refusal_stage = self.env['hr.recruitment.stage'].search(
+            [('is_refusal_stage', '=', True)], limit=1
+        )
+        if not refusal_stage:
+            return
+
+        vals = {}
+        if self.stage_id != refusal_stage:
+            vals['stage_id'] = refusal_stage.id
+        if not self.active:
+            vals['active'] = True
+        if vals:
+            self.write(vals)
 
     def _send_email_safely(self, subject, body_html, log_success, log_failure_prefix):
         """Envoie un email et trace le résultat RÉEL dans le chatter (succès
