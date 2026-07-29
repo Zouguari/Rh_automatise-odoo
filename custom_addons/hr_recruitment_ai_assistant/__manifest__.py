@@ -27,6 +27,7 @@
         'views/hr_recruitment_ai_settings_views.xml',
         'views/hr_applicant_views.xml',
         'views/hr_recruitment_stage_views.xml',
+        'views/hr_recruitment_stage_repair_action.xml',
         'wizards/hr_applicant_merge_wizard_views.xml',
         'wizards/hr_applicant_bulk_import_wizard_views.xml',
         'views/hr_job_views.xml',

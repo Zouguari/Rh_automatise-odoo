@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Entrée de menu dédiée plutôt qu'une action liée à la sélection de
+        lignes (ir.actions.server avec binding_view_types="list" n'apparaît
+        dans le menu Actions ⚙️ que si au moins une ligne est cochée, ce qui
+        n'a pas de sens pour une action globale comme celle-ci qui ne
+        dépend d'aucune sélection).
+    -->
+    <record id="action_repair_pipeline_stages" model="ir.actions.server">
+        <field name="name">Réparer la configuration du pipeline standard</field>
+        <field name="model_id" ref="hr_recruitment.model_hr_recruitment_stage"/>
+        <field name="state">code</field>
+        <field name="code">
+env['hr.recruitment.stage']._setup_default_pipeline_stages()
+action = {
+    'type': 'ir.actions.client',
+    'tag': 'display_notification',
+    'params': {
+        'title': "Pipeline vérifié",
+        'message': (
+            "Les 7 étapes standard (Nouveau, Qualification initiale, "
+            "Entretien RH, Entretien Technique, Proposition de contrat, "
+            "Contrat signé, Refusé) ont été vérifiées et corrigées si "
+            "nécessaire."
+        ),
+        'type': 'success',
+        'sticky': False,
+        'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+    },
+}
+        </field>
+    </record>
+
+    <menuitem id="menu_repair_pipeline_stages"
+              name="Réparer le pipeline standard"
+              parent="hr_recruitment.menu_hr_recruitment_configuration"
+              action="action_repair_pipeline_stages"
+              sequence="100"/>
+</odoo>
