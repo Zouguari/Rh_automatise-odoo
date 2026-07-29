@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Traite automatiquement les candidatures qui arrivent par un canal
+        externe (portail carrière web, email entrant) sans qu'un recruteur
+        ait besoin de cliquer manuellement sur "Pipeline IA complet".
+        Référence hr_recruitment.model_hr_applicant : convention standard
+        Odoo (model_<nom_technique>), générée automatiquement par le module
+        qui définit le modèle (hr_recruitment) — pas un identifiant deviné.
+    -->
+    <record id="ir_cron_auto_process_new_applicants" model="ir.cron">
+        <field name="name">Assistant RH IA : traitement automatique des nouvelles candidatures</field>
+        <field name="model_id" ref="hr_recruitment.model_hr_applicant"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_auto_process_new_applicants()</field>
+        <field name="interval_number">15</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
+</odoo>

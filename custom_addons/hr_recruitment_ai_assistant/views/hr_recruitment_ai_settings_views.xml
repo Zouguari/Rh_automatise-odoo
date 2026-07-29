@@ -12,6 +12,7 @@
                 </p>
                 <group>
                     <field name="gemini_api_key" password="True"/>
+                    <field name="auto_run_pipeline_on_create"/>
                 </group>
                 <p class="text-muted">
                     Astuce : clique sur "Tester la connexion" après avoir

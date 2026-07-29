@@ -183,6 +183,47 @@ class HrApplicant(models.Model):
     # --- Étape 3 : intégration Gemini ---
     ai_extraction_raw = fields.Text(string="Réponse brute Gemini (debug)")
 
+    @api.model
+    def _cron_auto_process_new_applicants(self):
+        """Traite automatiquement les nouvelles candidatures pas encore
+        analysées, quel que soit leur canal d'origine (portail carrière
+        web, email entrant via alias, création manuelle...).
+
+        Volontairement découplé du moment exact de création : pour une
+        candidature reçue via le portail public, le CV est parfois attaché
+        JUSTE APRÈS la création de la fiche (requête HTTP séparée) — un
+        déclenchement direct dans create() raterait le CV, pas encore là.
+        Un cron périodique est le pattern robuste pour ce cas : il repasse
+        régulièrement sur tout ce qui n'a pas encore été traité, peu
+        importe quand le CV est finalement arrivé."""
+        if not self.env['ir.config_parameter'].sudo().get_param(
+            'smart_hr_ai.auto_run_pipeline_on_create', default='1'
+        ):
+            return
+
+        candidates = self.search([('ai_processing_state', '=', 'pending')], limit=20)
+
+        for applicant in candidates:
+            if not applicant._get_cv_attachment():
+                continue  # pas encore de CV attaché, on retentera au prochain passage
+            try:
+                applicant.action_run_full_ai_pipeline()
+            except Exception as e:
+                # On marque explicitement en erreur pour ne pas retenter
+                # indéfiniment un CV structurellement illisible à chaque
+                # passage du cron (perte de temps + de quota IA).
+                _logger.warning(
+                    "Traitement IA automatique échoué pour %s (candidature #%s) : %s",
+                    applicant.partner_name, applicant.id, e,
+                )
+                applicant.ai_processing_state = 'error'
+                applicant.message_post(
+                    body=(
+                        f"⚠️ Analyse IA automatique (candidature reçue via portail/"
+                        f"email) échouée : {e}\nÀ relancer manuellement si besoin."
+                    )
+                )
+    
     def action_run_full_ai_pipeline(self):
         """Enchaîne automatiquement les 4 étapes de l'analyse IA d'un candidat :
         extraction du texte du CV, analyse IA structurée, calcul du score de

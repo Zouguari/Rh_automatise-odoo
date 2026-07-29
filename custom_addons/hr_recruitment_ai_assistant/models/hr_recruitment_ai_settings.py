@@ -21,20 +21,37 @@ class HrRecruitmentAiSettings(models.TransientModel):
         help="Clé obtenue sur Google AI Studio (ai.google.dev). Ne partage "
              "jamais cette clé et ne la commite jamais sur GitHub."
     )
+    auto_run_pipeline_on_create = fields.Boolean(
+        string="Analyser automatiquement les nouvelles candidatures",
+        help="Si coché : les candidatures arrivant par le portail carrière "
+             "web ou par email (alias entrant) sont analysées automatiquement "
+             "par l'IA (extraction, score, questions d'entretien) sans "
+             "action du recruteur, via une tâche planifiée qui repasse "
+             "toutes les 15 minutes. Décoche si tu préfères garder un "
+             "contrôle manuel (bouton Pipeline IA complet) sur chaque "
+             "candidat, par exemple pour maîtriser la consommation de "
+             "quota IA."
+    )
 
     @api.model
     def default_get(self, fields_list):
         res = super().default_get(fields_list)
+        config = self.env['ir.config_parameter'].sudo()
         if 'gemini_api_key' in fields_list:
-            res['gemini_api_key'] = self.env['ir.config_parameter'].sudo().get_param(
-                _CONFIG_PARAM, default=''
-            )
+            res['gemini_api_key'] = config.get_param(_CONFIG_PARAM, default='')
+        if 'auto_run_pipeline_on_create' in fields_list:
+            res['auto_run_pipeline_on_create'] = config.get_param(
+                'smart_hr_ai.auto_run_pipeline_on_create', default='1'
+            ) == '1'
         return res
 
     def action_save(self):
         self.ensure_one()
-        self.env['ir.config_parameter'].sudo().set_param(
-            _CONFIG_PARAM, self.gemini_api_key or ''
+        config = self.env['ir.config_parameter'].sudo()
+        config.set_param(_CONFIG_PARAM, self.gemini_api_key or '')
+        config.set_param(
+            'smart_hr_ai.auto_run_pipeline_on_create',
+            '1' if self.auto_run_pipeline_on_create else '0'
         )
         return {
             'type': 'ir.actions.client',
@@ -89,3 +106,4 @@ class HrRecruitmentAiSettings(models.TransientModel):
                 'sticky': True,
             },
         }
+        

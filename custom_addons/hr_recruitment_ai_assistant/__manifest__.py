@@ -23,6 +23,7 @@
         'security/ir.model.access.csv',
         'data/ir_config_parameter_data.xml',
         'data/mail_templates.xml',
+        'data/ir_cron_data.xml',
         'views/hr_recruitment_ai_views.xml',
         'views/hr_recruitment_ai_settings_views.xml',
         'views/hr_applicant_views.xml',
