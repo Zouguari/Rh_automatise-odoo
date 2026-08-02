@@ -18,6 +18,7 @@ RUN pip install --no-cache-dir -U \
     pdfplumber \
     python-docx \
     pytesseract \
-    pdf2image
+    pdf2image \
+    PyJWT
 
 USER odoo
