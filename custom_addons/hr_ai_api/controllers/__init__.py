@@ -2,3 +2,4 @@
 from . import auth
 from . import employees
 from . import leaves
+from . import attendance
