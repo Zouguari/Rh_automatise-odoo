@@ -20,6 +20,8 @@
     'depends': [
         'base',
         'hr',
+        'hr_holidays',
+        'hr_leaves_ai',
     ],
     'external_dependencies': {
         'python': ['jwt'],  # PyJWT — pip install PyJWT
