@@ -34,9 +34,15 @@ class HrAiApiLeavesController(http.Controller):
     @http.route('/api/v1/leaves', type='http', auth='none', methods=['POST'], csrf=False)
     @require_auth(['leaves:write'])
     def create_leave(self, **kwargs):
-        """Body JSON attendu : {"holiday_status_id": int, "date_from": "...",
-        "date_to": "...", "reason": "..."}. La recommandation IA est calculée
-        automatiquement à la création (voir hr_leaves_ai)."""
+        """Body JSON attendu : {"holiday_status_id": int, "date_from": "YYYY-MM-DD",
+        "date_to": "YYYY-MM-DD", "reason": "..."}. La recommandation IA est
+        calculée automatiquement à la création (voir hr_leaves_ai).
+
+        NOTE : on écrit dans request_date_from/request_date_to (les champs
+        réellement éditables du formulaire congés), PAS dans date_from/
+        date_to qui sont des champs calculés à partir des premiers — les
+        écrire directement les expose à être recalculés/écrasés silencieusement
+        avec la date du jour comme valeur par défaut."""
         payload = request.jwt_payload
         data = _get_json_body()
         if data is None:
@@ -57,8 +63,8 @@ class HrAiApiLeavesController(http.Controller):
             leave = request.env['hr.leave'].sudo().create({
                 'employee_id': employee_id,
                 'holiday_status_id': data['holiday_status_id'],
-                'date_from': data['date_from'],
-                'date_to': data['date_to'],
+                'request_date_from': data['date_from'],
+                'request_date_to': data['date_to'],
                 'name': data.get('reason', ''),
             })
         except (ValidationError, UserError) as exc:
