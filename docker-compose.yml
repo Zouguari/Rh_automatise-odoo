@@ -13,6 +13,7 @@ services:
       - HOST=db
       - USER=odoo
       - PASSWORD=odoo
+    command: ["odoo", "--db-filter=^rhDatabase$"]
   db:
     image: postgres:15
     environment:

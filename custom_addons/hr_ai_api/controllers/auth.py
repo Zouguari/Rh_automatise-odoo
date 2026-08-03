@@ -114,7 +114,7 @@ class HrAiApiAuthController(http.Controller):
     def auth_me(self, **kwargs):
         """Retourne le profil de l'utilisateur authentifié par l'access token."""
         payload = request.jwt_payload
-        user = request.env['res.users'].sudo().browse(payload['sub'])
+        user = request.env['res.users'].sudo().browse(int(payload['sub']))
         employee = None
         if payload.get('employee_id'):
             employee = request.env['hr.employee'].sudo().browse(payload['employee_id'])

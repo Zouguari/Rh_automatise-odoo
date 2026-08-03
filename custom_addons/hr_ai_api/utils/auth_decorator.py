@@ -10,13 +10,16 @@ Usage :
         payload = request.jwt_payload  # {'sub', 'employee_id', 'role', 'scopes', ...}
         ...
 """
+import logging
 from functools import wraps
 
 import jwt
 
 from odoo.http import request
 
-from .jwt_helper import decode_access_token
+from .jwt_helper import decode_access_token, get_jwt_secret
+
+_logger = logging.getLogger(__name__)
 
 
 def require_auth(scopes=None):
@@ -46,7 +49,17 @@ def require_auth(scopes=None):
                     },
                     status=401,
                 )
-            except jwt.InvalidTokenError:
+            except jwt.InvalidTokenError as exc:
+                # NOTE DEBUG : log volontairement verbeux le temps de
+                # diagnostiquer un souci de vérification de signature.
+                secret_preview = get_jwt_secret(request.env)[:8]
+                _logger.warning(
+                    "Échec de décodage JWT (%s: %s) — token reçu (30 premiers "
+                    "caractères) : %r ; longueur totale : %d ; secret utilisé "
+                    "(8 premiers caractères) : %s ; base de données : %s",
+                    type(exc).__name__, exc, token[:30], len(token),
+                    secret_preview, request.env.cr.dbname,
+                )
                 return request.make_json_response(
                     {'error': 'invalid_token', 'message': "Jeton d'accès invalide."},
                     status=401,

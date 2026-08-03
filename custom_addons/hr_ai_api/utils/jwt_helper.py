@@ -40,7 +40,7 @@ def encode_access_token(env, user, employee, scopes, role):
     """Construit et signe l'access token JWT pour un utilisateur authentifié."""
     now = datetime.now(timezone.utc)
     payload = {
-        'sub': user.id,
+        'sub': str(user.id),
         'employee_id': employee.id if employee else False,
         'scopes': scopes,
         'role': role,
