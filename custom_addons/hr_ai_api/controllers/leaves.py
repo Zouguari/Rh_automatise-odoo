@@ -2,6 +2,7 @@
 import json
 
 from odoo import http
+from odoo.exceptions import UserError, ValidationError
 from odoo.http import request
 
 from ..utils.auth_decorator import require_auth
@@ -52,13 +53,19 @@ class HrAiApiLeavesController(http.Controller):
         if not employee_id:
             return _error(400, 'no_employee_linked', "Aucun employé lié à cet utilisateur.")
 
-        leave = request.env['hr.leave'].sudo().create({
-            'employee_id': employee_id,
-            'holiday_status_id': data['holiday_status_id'],
-            'date_from': data['date_from'],
-            'date_to': data['date_to'],
-            'name': data.get('reason', ''),
-        })
+        try:
+            leave = request.env['hr.leave'].sudo().create({
+                'employee_id': employee_id,
+                'holiday_status_id': data['holiday_status_id'],
+                'date_from': data['date_from'],
+                'date_to': data['date_to'],
+                'name': data.get('reason', ''),
+            })
+        except (ValidationError, UserError) as exc:
+            # Ex : chevauchement avec un congé existant, solde insuffisant
+            # selon le type de congé, etc. — règles métier natives d'Odoo.
+            return _error(400, 'business_rule_violation', str(exc))
+
         return request.make_json_response(_serialize_leave(leave, detailed=True), status=201)
 
     @http.route('/api/v1/leaves/<int:leave_id>', type='http', auth='none', methods=['GET'], csrf=False)
@@ -87,7 +94,10 @@ class HrAiApiLeavesController(http.Controller):
         # action_approve() — à vérifier sur votre configuration, comme pour
         # authenticate() précédemment. En simple validation, action_approve()
         # suffit.
-        leave.action_approve()
+        try:
+            leave.action_approve()
+        except (ValidationError, UserError) as exc:
+            return _error(400, 'business_rule_violation', str(exc))
         return request.make_json_response(_serialize_leave(leave, detailed=True))
 
     @http.route('/api/v1/leaves/<int:leave_id>/refuse', type='http', auth='none', methods=['POST'], csrf=False)
@@ -97,7 +107,10 @@ class HrAiApiLeavesController(http.Controller):
         if not leave.exists():
             return _error(404, 'not_found', "Demande introuvable.")
 
-        leave.action_refuse()
+        try:
+            leave.action_refuse()
+        except (ValidationError, UserError) as exc:
+            return _error(400, 'business_rule_violation', str(exc))
         return request.make_json_response(_serialize_leave(leave, detailed=True))
 
     @http.route('/api/v1/leaves/team-conflicts', type='http', auth='none', methods=['GET'], csrf=False)
