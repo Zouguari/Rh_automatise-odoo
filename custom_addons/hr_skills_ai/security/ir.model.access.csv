@@ -1,0 +1,5 @@
+id,name,model_id/id,group_id/id,perm_read,perm_write,perm_create,perm_unlink
+access_hr_job_skill_user,hr.job.skill.user,model_hr_job_skill,base.group_user,1,0,0,0
+access_hr_job_skill_hr,hr.job.skill.hr,model_hr_job_skill,hr.group_hr_manager,1,1,1,1
+access_hr_training_course_user,hr.training.course.user,model_hr_training_course,base.group_user,1,0,0,0
+access_hr_training_course_hr,hr.training.course.hr,model_hr_training_course,hr.group_hr_manager,1,1,1,1

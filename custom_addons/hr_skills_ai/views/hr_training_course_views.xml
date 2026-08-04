@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_training_course_list" model="ir.ui.view">
+        <field name="name">hr.training.course.list</field>
+        <field name="model">hr.training.course</field>
+        <field name="arch" type="xml">
+            <tree editable="bottom">
+                <field name="name"/>
+                <field name="skill_id"/>
+                <field name="duration_hours"/>
+                <field name="url"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_hr_training_course_form" model="ir.ui.view">
+        <field name="name">hr.training.course.form</field>
+        <field name="model">hr.training.course</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="skill_id"/>
+                        <field name="duration_hours"/>
+                        <field name="url"/>
+                        <field name="description"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_hr_training_course" model="ir.actions.act_window">
+        <field name="name">Catalogue de formations</field>
+        <field name="res_model">hr.training.course</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <menuitem id="menu_hr_training_course"
+              name="Catalogue de formations"
+              parent="hr.menu_human_resources_configuration"
+              action="action_hr_training_course"
+              sequence="61"/>
+</odoo>

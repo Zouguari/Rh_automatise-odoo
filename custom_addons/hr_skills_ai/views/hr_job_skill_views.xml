@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_job_skill_list" model="ir.ui.view">
+        <field name="name">hr.job.skill.list</field>
+        <field name="model">hr.job.skill</field>
+        <field name="arch" type="xml">
+            <tree editable="bottom">
+                <field name="job_id"/>
+                <field name="skill_type_id"/>
+                <field name="skill_id"/>
+                <field name="required_level_id"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="action_hr_job_skill" model="ir.actions.act_window">
+        <field name="name">Compétences requises par poste</field>
+        <field name="res_model">hr.job.skill</field>
+        <field name="view_mode">tree</field>
+    </record>
+
+    <menuitem id="menu_hr_job_skill"
+              name="Compétences requises par poste"
+              parent="hr.menu_human_resources_configuration"
+              action="action_hr_job_skill"
+              sequence="60"/>
+</odoo>
