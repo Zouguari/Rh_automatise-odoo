@@ -24,6 +24,8 @@
         'hr_leaves_ai',
         'hr_attendance',
         'hr_attendance_ai',
+        'hr_skills',
+        'hr_skills_ai',
     ],
     'external_dependencies': {
         'python': ['jwt'],  # PyJWT — pip install PyJWT
