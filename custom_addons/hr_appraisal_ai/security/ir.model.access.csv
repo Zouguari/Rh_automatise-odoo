@@ -1,0 +1,5 @@
+id,name,model_id/id,group_id/id,perm_read,perm_write,perm_create,perm_unlink
+access_hr_appraisal_user,hr.appraisal.user,model_hr_appraisal,base.group_user,1,0,0,0
+access_hr_appraisal_hr,hr.appraisal.hr,model_hr_appraisal,hr.group_hr_manager,1,1,1,1
+access_hr_appraisal_ai_analysis_user,hr.appraisal.ai.analysis.user,model_hr_appraisal_ai_analysis,base.group_user,1,0,0,0
+access_hr_appraisal_ai_analysis_hr,hr.appraisal.ai.analysis.hr,model_hr_appraisal_ai_analysis,hr.group_hr_manager,1,1,1,1
