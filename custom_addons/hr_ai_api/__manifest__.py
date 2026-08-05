@@ -8,7 +8,7 @@
         Module technique dédié à l'exposition d'API REST pour l'application
         mobile Smart HR AI (React). Ne contient aucune logique métier RH :
         il fait uniquement le pont entre les modules Odoo (hr, hr_holidays,
-        hr_attendance, hr_skills, hr_appraisal, ...) et l'application mobile.
+        hr_attendance, hr_skills, hr_appraisal_ai, ...) et l'application mobile.
 
         Contenu de cette première itération :
         - Authentification OAuth2 / JWT (access token + refresh token)
@@ -26,6 +26,7 @@
         'hr_attendance_ai',
         'hr_skills',
         'hr_skills_ai',
+        'hr_appraisal_ai',
     ],
     'external_dependencies': {
         'python': ['jwt'],  # PyJWT — pip install PyJWT
