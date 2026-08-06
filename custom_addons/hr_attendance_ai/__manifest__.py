@@ -20,6 +20,7 @@
     'data': [
         'security/ir.model.access.csv',
         'data/ir_cron_data.xml',
+        'views/hr_attendance_ai_views.xml',
     ],
     'installable': True,
     'application': False,

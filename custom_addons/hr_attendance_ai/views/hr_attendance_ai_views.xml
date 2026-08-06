@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Indicateurs IA sur la fiche pointage standard -->
+    <record id="view_hr_attendance_form_ai_inherit" model="ir.ui.view">
+        <field name="name">hr.attendance.form.ai.inherit</field>
+        <field name="model">hr.attendance</field>
+        <field name="inherit_id" ref="hr_attendance.hr_attendance_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet/group[1]" position="after">
+                <group string="Indicateurs IA Smart HR">
+                    <group>
+                        <field name="is_late"/>
+                        <field name="late_minutes"/>
+                    </group>
+                    <group>
+                        <field name="anomaly_type" widget="badge"
+                               decoration-warning="anomaly_type == 'late'"
+                               decoration-danger="anomaly_type == 'missing_checkout'"/>
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Colonnes IA dans la liste standard -->
+    <record id="view_hr_attendance_tree_ai_inherit" model="ir.ui.view">
+        <field name="name">hr.attendance.tree.ai.inherit</field>
+        <field name="model">hr.attendance</field>
+        <field name="inherit_id" ref="hr_attendance.view_attendance_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//tree" position="inside">
+                <field name="is_late" optional="show"/>
+                <field name="late_minutes" optional="hide"/>
+                <field name="anomaly_type" optional="show" widget="badge"
+                       decoration-warning="anomaly_type == 'late'"
+                       decoration-danger="anomaly_type == 'missing_checkout'"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_hr_attendance_ai_list" model="ir.ui.view">
+        <field name="name">hr.attendance.ai.list</field>
+        <field name="model">hr.attendance</field>
+        <field name="arch" type="xml">
+            <tree string="Présences IA" default_order="check_in desc"
+                  decoration-warning="is_late"
+                  decoration-danger="anomaly_type == 'missing_checkout'">
+                <field name="employee_id"/>
+                <field name="check_in"/>
+                <field name="check_out"/>
+                <field name="worked_hours"/>
+                <field name="is_late"/>
+                <field name="late_minutes"/>
+                <field name="anomaly_type" widget="badge"
+                       decoration-warning="anomaly_type == 'late'"
+                       decoration-danger="anomaly_type == 'missing_checkout'"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_hr_attendance_ai_form" model="ir.ui.view">
+        <field name="name">hr.attendance.ai.form</field>
+        <field name="model">hr.attendance</field>
+        <field name="arch" type="xml">
+            <form string="Pointage — analyse IA">
+                <sheet>
+                    <group>
+                        <field name="employee_id"/>
+                        <field name="check_in"/>
+                        <field name="check_out"/>
+                        <field name="worked_hours"/>
+                    </group>
+                    <group string="Indicateurs IA">
+                        <field name="is_late"/>
+                        <field name="late_minutes"/>
+                        <field name="anomaly_type" widget="badge"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hr_attendance_ai_search" model="ir.ui.view">
+        <field name="name">hr.attendance.ai.search</field>
+        <field name="model">hr.attendance</field>
+        <field name="arch" type="xml">
+            <search string="Rechercher des présences IA">
+                <field name="employee_id"/>
+                <filter string="En retard" name="late" domain="[('is_late', '=', True)]"/>
+                <filter string="Sortie manquante" name="missing_checkout"
+                        domain="[('anomaly_type', '=', 'missing_checkout')]"/>
+                <group expand="0" string="Regrouper par">
+                    <filter string="Employé" name="group_employee" context="{'group_by': 'employee_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_hr_attendance_anomaly_list" model="ir.ui.view">
+        <field name="name">hr.attendance.anomaly.list</field>
+        <field name="model">hr.attendance.anomaly</field>
+        <field name="arch" type="xml">
+            <tree string="Anomalies de présence" default_order="detected_on desc"
+                  decoration-danger="resolved == False"
+                  decoration-success="resolved == True">
+                <field name="employee_id"/>
+                <field name="attendance_id"/>
+                <field name="anomaly_type" widget="badge"/>
+                <field name="detected_on"/>
+                <field name="resolved"/>
+                <field name="notes"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_hr_attendance_anomaly_form" model="ir.ui.view">
+        <field name="name">hr.attendance.anomaly.form</field>
+        <field name="model">hr.attendance.anomaly</field>
+        <field name="arch" type="xml">
+            <form string="Anomalie de présence">
+                <header>
+                    <button name="action_mark_resolved"
+                            string="Marquer comme résolue"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="resolved"/>
+                </header>
+                <sheet>
+                    <group>
+                        <field name="employee_id"/>
+                        <field name="attendance_id"/>
+                        <field name="anomaly_type"/>
+                        <field name="detected_on"/>
+                        <field name="resolved"/>
+                    </group>
+                    <group string="Détails">
+                        <field name="notes" nolabel="1" placeholder="Détails de l'anomalie détectée..."/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hr_attendance_anomaly_search" model="ir.ui.view">
+        <field name="name">hr.attendance.anomaly.search</field>
+        <field name="model">hr.attendance.anomaly</field>
+        <field name="arch" type="xml">
+            <search string="Rechercher des anomalies">
+                <field name="employee_id"/>
+                <field name="anomaly_type"/>
+                <filter string="Non résolues" name="unresolved" domain="[('resolved', '=', False)]"/>
+                <filter string="Résolues" name="resolved" domain="[('resolved', '=', True)]"/>
+                <filter string="Retards répétés" name="repeated"
+                        domain="[('anomaly_type', '=', 'repeated_lateness')]"/>
+                <filter string="Sortie manquante" name="missing"
+                        domain="[('anomaly_type', '=', 'missing_checkout')]"/>
+                <group expand="0" string="Regrouper par">
+                    <filter string="Employé" name="group_employee" context="{'group_by': 'employee_id'}"/>
+                    <filter string="Type" name="group_type" context="{'group_by': 'anomaly_type'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_hr_attendance_ai" model="ir.actions.act_window">
+        <field name="name">Présences IA</field>
+        <field name="res_model">hr.attendance</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_hr_attendance_ai_search"/>
+        <field name="view_ids"
+               eval="[(5, 0, 0),
+                      (0, 0, {'view_mode': 'tree', 'view_id': ref('view_hr_attendance_ai_list')}),
+                      (0, 0, {'view_mode': 'form', 'view_id': ref('view_hr_attendance_ai_form')})]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Aucun pointage enregistré.</p>
+            <p>Les retards et anomalies sont calculés automatiquement selon le calendrier de travail.</p>
+        </field>
+    </record>
+
+    <record id="action_hr_attendance_anomaly" model="ir.actions.act_window">
+        <field name="name">Anomalies détectées</field>
+        <field name="res_model">hr.attendance.anomaly</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_hr_attendance_anomaly_search"/>
+        <field name="context">{'search_default_unresolved': 1}</field>
+    </record>
+
+    <record id="action_hr_attendance_late" model="ir.actions.act_window">
+        <field name="name">Retards du jour</field>
+        <field name="res_model">hr.attendance</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_hr_attendance_ai_search"/>
+        <field name="domain">[('is_late', '=', True)]</field>
+        <field name="view_ids"
+               eval="[(5, 0, 0),
+                      (0, 0, {'view_mode': 'tree', 'view_id': ref('view_hr_attendance_ai_list')}),
+                      (0, 0, {'view_mode': 'form', 'view_id': ref('view_hr_attendance_ai_form')})]"/>
+    </record>
+
+    <menuitem id="menu_hr_attendance_ai"
+              name="Présences IA"
+              parent="hr_attendance.menu_hr_attendance_root"
+              action="action_hr_attendance_ai"
+              sequence="35"/>
+
+    <menuitem id="menu_hr_attendance_late"
+              name="Retards"
+              parent="menu_hr_attendance_ai"
+              action="action_hr_attendance_late"
+              sequence="5"/>
+
+    <menuitem id="menu_hr_attendance_anomaly"
+              name="Anomalies détectées"
+              parent="menu_hr_attendance_ai"
+              action="action_hr_attendance_anomaly"
+              sequence="10"/>
+
+</odoo>

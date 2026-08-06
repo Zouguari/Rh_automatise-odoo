@@ -24,6 +24,9 @@ class HrAttendanceAnomaly(models.Model):
     notes = fields.Text()
     resolved = fields.Boolean(string="Résolue", default=False)
 
+    def action_mark_resolved(self):
+        self.write({'resolved': True})
+
     @api.model
     def _cron_detect_attendance_anomalies(self):
         """Point d'entrée du cron quotidien (voir data/ir_cron_data.xml)."""

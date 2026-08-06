@@ -21,6 +21,7 @@
     'depends': ['hr_holidays'],
     'data': [
         'security/ir.model.access.csv',
+        'views/hr_leave_ai_views.xml',
     ],
     'installable': True,
     'application': False,
