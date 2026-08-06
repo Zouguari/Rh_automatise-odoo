@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_skills_gap_wizard_form" model="ir.ui.view">
+        <field name="name">hr.skills.gap.wizard.form</field>
+        <field name="model">hr.skills.gap.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Analyse des Compétences &amp; Lacunes (Skills Gap)">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Analyse des Compétences (Skills Gap)</h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="employee_id" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="job_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Compétences Acquises">
+                            <field name="matched_skills" readonly="1" nolabel="1"/>
+                        </page>
+                        <page string="Compétences Manquantes (Lacunes)">
+                            <field name="missing_skills" readonly="1" nolabel="1"/>
+                        </page>
+                        <page string="Compétences À Renforcer">
+                            <field name="underleveled_skills" readonly="1" nolabel="1"/>
+                        </page>
+                        <page string="Formations Recommandées">
+                            <field name="recommended_courses" readonly="1" nolabel="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <footer>
+                    <button string="Fermer" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

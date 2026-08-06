@@ -13,6 +13,7 @@ Module metier (aucune route HTTP ici, voir hr_ai_api) qui ajoute la gestion des 
         'security/ir.model.access.csv',
         'views/hr_job_skill_views.xml',
         'views/hr_training_course_views.xml',
+        'wizards/hr_skills_gap_wizard_views.xml',
     ],
     'installable': True,
     'application': False,
