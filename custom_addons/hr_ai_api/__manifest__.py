@@ -33,6 +33,7 @@
     },
     'data': [
         'security/ir.model.access.csv',
+        'views/smart_hr_ai_menus.xml',
     ],
     'demo': [],
     'installable': True,

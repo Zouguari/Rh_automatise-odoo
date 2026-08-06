@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Menu central Smart HR AI — point d'entrée back-office pour la démo PFA -->
+    <menuitem id="menu_smart_hr_ai_root"
+              name="Smart HR AI"
+              parent="hr.menu_hr_root"
+              sequence="5"/>
+
+    <menuitem id="menu_smart_hr_ai_leaves"
+              name="Congés IA"
+              parent="menu_smart_hr_ai_root"
+              action="hr_leaves_ai.action_hr_leave_ai"
+              sequence="10"/>
+
+    <menuitem id="menu_smart_hr_ai_leaves_caution"
+              name="Congés en vigilance"
+              parent="menu_smart_hr_ai_root"
+              action="hr_leaves_ai.action_hr_leave_ai_caution"
+              sequence="11"/>
+
+    <menuitem id="menu_smart_hr_ai_attendance"
+              name="Présences IA"
+              parent="menu_smart_hr_ai_root"
+              action="hr_attendance_ai.action_hr_attendance_ai"
+              sequence="20"/>
+
+    <menuitem id="menu_smart_hr_ai_anomalies"
+              name="Anomalies de présence"
+              parent="menu_smart_hr_ai_root"
+              action="hr_attendance_ai.action_hr_attendance_anomaly"
+              sequence="21"/>
+
+    <menuitem id="menu_smart_hr_ai_skills"
+              name="Compétences requises"
+              parent="menu_smart_hr_ai_root"
+              action="hr_skills_ai.action_hr_job_skill"
+              sequence="30"/>
+
+    <menuitem id="menu_smart_hr_ai_training"
+              name="Catalogue de formations"
+              parent="menu_smart_hr_ai_root"
+              action="hr_skills_ai.action_hr_training_course"
+              sequence="31"/>
+
+    <menuitem id="menu_smart_hr_ai_appraisals"
+              name="Évaluations IA"
+              parent="menu_smart_hr_ai_root"
+              action="hr_appraisal_ai.action_hr_appraisal_ai"
+              sequence="40"/>
+
+    <menuitem id="menu_smart_hr_ai_high_potentials"
+              name="Hauts potentiels"
+              parent="menu_smart_hr_ai_root"
+              action="hr_appraisal_ai.action_hr_appraisal_high_potentials"
+              sequence="41"/>
+
+</odoo>
