@@ -18,6 +18,10 @@
         'hr_recruitment',
         'project',
         'hr_contract',
+        'hr_skills_ai',
+        'hr_appraisal_ai',
+        'hr_leaves_ai',
+        'hr_attendance_ai',
     ],
     'data': [
         'security/ir.model.access.csv',
@@ -27,6 +31,7 @@
         'views/hr_recruitment_ai_views.xml',
         'views/hr_recruitment_ai_settings_views.xml',
         'views/hr_applicant_views.xml',
+        'views/hr_employee_views.xml',
         'views/hr_recruitment_stage_views.xml',
         'views/hr_recruitment_stage_repair_action.xml',
         'wizards/hr_applicant_merge_wizard_views.xml',

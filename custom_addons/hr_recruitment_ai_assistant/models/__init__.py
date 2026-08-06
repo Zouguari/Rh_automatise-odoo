@@ -12,3 +12,4 @@ from . import hr_recruitment_stage
 from . import ai_interview
 from . import project_task
 from . import hr_contract
+from . import hr_employee

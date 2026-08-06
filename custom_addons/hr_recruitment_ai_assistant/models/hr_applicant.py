@@ -964,14 +964,75 @@ class HrApplicant(models.Model):
         )
 
     def create_employee_from_applicant(self):
-        # Appelle le comportement natif d'Odoo (crée hr.employee, lie applicant à employee_id)
+        """Crée ou rattache un employé depuis la candidature, transfère les résultats
+        d'analyse IA, et déclenche l'onboarding IA automatique."""
+        for applicant in self:
+            if not applicant.emp_id:
+                existing_emp = False
+                if applicant.email_from:
+                    existing_emp = self.env['hr.employee'].sudo().search([
+                        '|',
+                        ('work_email', '=ilike', applicant.email_from.strip()),
+                        ('private_email', '=ilike', applicant.email_from.strip()),
+                    ], limit=1)
+                if not existing_emp and applicant.partner_name:
+                    existing_emp = self.env['hr.employee'].sudo().search([
+                        ('name', '=ilike', applicant.partner_name.strip())
+                    ], limit=1)
+
+                if existing_emp:
+                    applicant.emp_id = existing_emp.id
+
         result = super(HrApplicant, self).create_employee_from_applicant()
+
         for applicant in self:
             if applicant.emp_id:
+                # Lien permanent bidirectionnel
+                applicant.emp_id.sudo().write({'applicant_id': applicant.id})
+
+                # Service réutilisable : transfert des données IA du recrutement
+                applicant._transfer_ai_recruitment_data_to_employee(applicant.emp_id)
+
+                # Rattachement département & tâches onboarding
                 applicant._ensure_employee_department()
                 applicant._generate_onboarding_contract()
                 applicant._create_onboarding_tasks()
+
+                # Service réutilisable : déclenchement Onboarding IA automatique
+                if hasattr(applicant.emp_id, 'action_run_ai_onboarding'):
+                    applicant.emp_id.action_run_ai_onboarding()
+
         return result
+
+    def _transfer_ai_recruitment_data_to_employee(self, employee):
+        """Transfère les données d'analyse IA de la candidature vers l'employé sans re-calculer."""
+        self.ensure_one()
+        if not employee:
+            return
+        employee.sudo().write({
+            'ai_recruitment_score': self.ai_score or 0.0,
+            'ai_recruitment_summary': self.ai_summary or '',
+            'ai_extracted_skills': self.extracted_skills or '',
+            'ai_extracted_technologies': self.ai_matched_skills or '',
+            'ai_extracted_soft_skills': self.ai_recommendation or '',
+            'ai_extracted_languages': self.extracted_languages or '',
+            'ai_extracted_certifications': self.extracted_certifications or '',
+        })
+
+    def action_view_employee(self):
+        """Action pour le smart button 'Employé créé' sur la candidature."""
+        self.ensure_one()
+        if not self.emp_id:
+            return {}
+        return {
+            'name': "Fiche Employé",
+            'type': 'ir.actions.act_window',
+            'res_model': 'hr.employee',
+            'res_id': self.emp_id.id,
+            'view_mode': 'form',
+            'target': 'current',
+        }
+
 
     def _ensure_employee_department(self):
         """Garantit que l'employé créé depuis ce candidat est bien rattaché

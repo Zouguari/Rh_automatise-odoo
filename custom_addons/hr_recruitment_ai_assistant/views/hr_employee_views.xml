@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Vue formulaire employé étendue pour Smart HR AI Lifecycle -->
+    <record id="view_employee_form_smart_hr_ai_inherit" model="ir.ui.view">
+        <field name="name">hr.employee.form.smart.hr.ai.inherit</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="arch" type="xml">
+
+            <!-- Smart buttons dans le header de la fiche employé -->
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_origin_applicant" type="object"
+                        class="oe_stat_button" icon="fa-user-tie"
+                        invisible="not applicant_id">
+                    <field name="applicant_count" widget="statinfo" string="Candidature IA"/>
+                </button>
+
+                <button name="action_view_appraisals" type="object"
+                        class="oe_stat_button" icon="fa-star">
+                    <field name="appraisal_count" widget="statinfo" string="Évaluations IA"/>
+                </button>
+
+                <button name="action_view_skills_gap" type="object"
+                        class="oe_stat_button" icon="fa-line-chart">
+                    <div class="o_field_widget o_stat_info">
+                        <span class="o_stat_text">Skills Gap</span>
+                    </div>
+                </button>
+
+                <button name="action_view_recommended_trainings" type="object"
+                        class="oe_stat_button" icon="fa-graduation-cap">
+                    <field name="recommended_training_count" widget="statinfo" string="Formations"/>
+                </button>
+
+                <button name="action_view_leaves" type="object"
+                        class="oe_stat_button" icon="fa-calendar-check-o">
+                    <field name="leave_ai_count" widget="statinfo" string="Congés IA"/>
+                </button>
+
+                <button name="action_view_attendance_anomalies" type="object"
+                        class="oe_stat_button" icon="fa-clock-o">
+                    <field name="attendance_anomaly_count" widget="statinfo" string="Anomalies"/>
+                </button>
+            </xpath>
+
+            <!-- Onglet "Smart HR AI Lifecycle" dans la fiche employé -->
+            <xpath expr="//notebook" position="inside">
+                <page string="Lifecycle &amp; Recrutement IA" name="ai_lifecycle">
+                    <group>
+                        <group string="Synthèse du Recrutement IA">
+                            <field name="applicant_id" readonly="1"/>
+                            <field name="ai_recruitment_score" widget="progressbar"/>
+                            <field name="onboarding_ai_completed" readonly="1"/>
+                            <field name="onboarding_ai_date" readonly="1"/>
+                        </group>
+                        <group string="Profil &amp; Compétences">
+                            <field name="ai_extracted_skills" readonly="1"/>
+                            <field name="ai_extracted_technologies" readonly="1"/>
+                            <field name="ai_extracted_soft_skills" readonly="1"/>
+                            <field name="ai_extracted_languages" readonly="1"/>
+                            <field name="ai_extracted_certifications" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Synthèse Recrutement">
+                        <field name="ai_recruitment_summary" readonly="1" nolabel="1"/>
+                    </group>
+                </page>
+            </xpath>
+
+        </field>
+    </record>
+</odoo>
