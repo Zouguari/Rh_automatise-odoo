@@ -32,6 +32,9 @@ class HrAppraisal(models.Model):
         for appraisal in self:
             appraisal.name = appraisal.employee_id.name if appraisal.employee_id else "Évaluation"
 
+    def action_mark_done(self):
+        self.write({'state': 'done'})
+
     def action_generate_ai_appraisal(self):
         """Calcule (ou recalcule) l'analyse IA de chaque évaluation.
 

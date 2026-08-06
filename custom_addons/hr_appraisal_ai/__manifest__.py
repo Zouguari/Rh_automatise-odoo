@@ -11,6 +11,7 @@ Module metier (aucune route HTTP ici, voir hr_ai_api) qui definit son propre mod
     'depends': ['hr', 'hr_attendance_ai', 'hr_skills_ai'],
     'data': [
         'security/ir.model.access.csv',
+        'views/hr_appraisal_ai_views.xml',
     ],
     'installable': True,
     'application': False,

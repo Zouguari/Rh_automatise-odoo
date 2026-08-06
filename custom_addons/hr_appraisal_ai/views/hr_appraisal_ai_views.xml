@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_hr_appraisal_ai_list" model="ir.ui.view">
+        <field name="name">hr.appraisal.ai.list</field>
+        <field name="model">hr.appraisal</field>
+        <field name="arch" type="xml">
+            <tree string="Évaluations IA" default_order="create_date desc"
+                  decoration-success="ai_high_potential">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="manager_id"/>
+                <field name="state" widget="badge"/>
+                <field name="ai_performance_score" widget="progressbar" options="{'max_value': 100}"/>
+                <field name="ai_high_potential"/>
+                <field name="ai_computed_on"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_hr_appraisal_ai_kanban" model="ir.ui.view">
+        <field name="name">hr.appraisal.ai.kanban</field>
+        <field name="model">hr.appraisal</field>
+        <field name="arch" type="xml">
+            <kanban default_order="ai_performance_score desc" class="o_kanban_mobile">
+                <field name="employee_id"/>
+                <field name="ai_performance_score"/>
+                <field name="ai_high_potential"/>
+                <field name="state"/>
+                <field name="name"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div class="oe_kanban_global_click o_kanban_card p-3">
+                            <div class="o_kanban_record_top mb-2">
+                                <strong><field name="employee_id"/></strong>
+                                <span t-if="record.ai_high_potential.raw_value"
+                                      class="badge text-bg-success float-end">Haut potentiel</span>
+                            </div>
+                            <div class="mt-2">
+                                <field name="ai_performance_score" widget="progressbar"
+                                       options="{'max_value': 100}"/>
+                            </div>
+                            <div class="text-muted mt-2">
+                                <field name="state" widget="badge"/>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_hr_appraisal_ai_form" model="ir.ui.view">
+        <field name="name">hr.appraisal.ai.form</field>
+        <field name="model">hr.appraisal</field>
+        <field name="arch" type="xml">
+            <form string="Évaluation de performance IA">
+                <header>
+                    <button name="action_generate_ai_appraisal"
+                            string="Générer l'analyse IA"
+                            type="object"
+                            class="oe_highlight"
+                            icon="fa-magic"/>
+                    <button name="action_mark_done"
+                            string="Terminer"
+                            type="object"
+                            invisible="state == 'done'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Évaluation"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="employee_id"/>
+                            <field name="manager_id"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group string="Résultat IA">
+                            <field name="ai_performance_score" widget="progressbar"
+                                   options="{'max_value': 100}"/>
+                            <field name="ai_high_potential"/>
+                            <field name="ai_computed_on"/>
+                        </group>
+                    </group>
+                    <group string="Synthèse IA">
+                        <field name="ai_summary" nolabel="1"
+                               placeholder="Cliquez sur « Générer l'analyse IA » pour obtenir une synthèse."/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hr_appraisal_ai_search" model="ir.ui.view">
+        <field name="name">hr.appraisal.ai.search</field>
+        <field name="model">hr.appraisal</field>
+        <field name="arch" type="xml">
+            <search string="Rechercher des évaluations">
+                <field name="employee_id"/>
+                <field name="manager_id"/>
+                <field name="state"/>
+                <filter string="Hauts potentiels" name="high_potential"
+                        domain="[('ai_high_potential', '=', True)]"/>
+                <filter string="Analysées" name="analyzed"
+                        domain="[('ai_computed_on', '!=', False)]"/>
+                <filter string="Brouillon" name="draft" domain="[('state', '=', 'draft')]"/>
+                <filter string="Terminées" name="done" domain="[('state', '=', 'done')]"/>
+                <group expand="0" string="Regrouper par">
+                    <filter string="Employé" name="group_employee" context="{'group_by': 'employee_id'}"/>
+                    <filter string="Manager" name="group_manager" context="{'group_by': 'manager_id'}"/>
+                    <filter string="État" name="group_state" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_hr_appraisal_ai_analysis_list" model="ir.ui.view">
+        <field name="name">hr.appraisal.ai.analysis.list</field>
+        <field name="model">hr.appraisal.ai.analysis</field>
+        <field name="arch" type="xml">
+            <tree string="Historique des analyses IA" default_order="create_date desc">
+                <field name="appraisal_id"/>
+                <field name="employee_id"/>
+                <field name="performance_score" widget="progressbar" options="{'max_value': 100}"/>
+                <field name="high_potential"/>
+                <field name="create_date"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_hr_appraisal_ai_analysis_form" model="ir.ui.view">
+        <field name="name">hr.appraisal.ai.analysis.form</field>
+        <field name="model">hr.appraisal.ai.analysis</field>
+        <field name="arch" type="xml">
+            <form string="Analyse IA">
+                <sheet>
+                    <group>
+                        <field name="appraisal_id"/>
+                        <field name="employee_id"/>
+                        <field name="performance_score" widget="progressbar"
+                               options="{'max_value': 100}"/>
+                        <field name="high_potential"/>
+                        <field name="create_date"/>
+                    </group>
+                    <group string="Synthèse">
+                        <field name="summary" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_hr_appraisal_ai" model="ir.actions.act_window">
+        <field name="name">Évaluations IA</field>
+        <field name="res_model">hr.appraisal</field>
+        <field name="view_mode">kanban,tree,form</field>
+        <field name="search_view_id" ref="view_hr_appraisal_ai_search"/>
+        <field name="view_ids"
+               eval="[(5, 0, 0),
+                      (0, 0, {'view_mode': 'kanban', 'view_id': ref('view_hr_appraisal_ai_kanban')}),
+                      (0, 0, {'view_mode': 'tree', 'view_id': ref('view_hr_appraisal_ai_list')}),
+                      (0, 0, {'view_mode': 'form', 'view_id': ref('view_hr_appraisal_ai_form')})]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Créez une évaluation de performance.</p>
+            <p>Le score IA combine la ponctualité et la couverture des compétences requises.</p>
+        </field>
+    </record>
+
+    <record id="action_hr_appraisal_high_potentials" model="ir.actions.act_window">
+        <field name="name">Hauts potentiels</field>
+        <field name="res_model">hr.appraisal</field>
+        <field name="view_mode">kanban,tree,form</field>
+        <field name="search_view_id" ref="view_hr_appraisal_ai_search"/>
+        <field name="domain">[('ai_high_potential', '=', True)]</field>
+        <field name="view_ids"
+               eval="[(5, 0, 0),
+                      (0, 0, {'view_mode': 'kanban', 'view_id': ref('view_hr_appraisal_ai_kanban')}),
+                      (0, 0, {'view_mode': 'tree', 'view_id': ref('view_hr_appraisal_ai_list')}),
+                      (0, 0, {'view_mode': 'form', 'view_id': ref('view_hr_appraisal_ai_form')})]"/>
+    </record>
+
+    <record id="action_hr_appraisal_ai_analysis" model="ir.actions.act_window">
+        <field name="name">Historique des analyses IA</field>
+        <field name="res_model">hr.appraisal.ai.analysis</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <menuitem id="menu_hr_appraisal_ai"
+              name="Évaluations IA"
+              parent="hr.menu_hr_root"
+              action="action_hr_appraisal_ai"
+              sequence="45"/>
+
+    <menuitem id="menu_hr_appraisal_high_potentials"
+              name="Hauts potentiels"
+              parent="menu_hr_appraisal_ai"
+              action="action_hr_appraisal_high_potentials"
+              sequence="5"/>
+
+    <menuitem id="menu_hr_appraisal_ai_analysis"
+              name="Historique des analyses"
+              parent="menu_hr_appraisal_ai"
+              action="action_hr_appraisal_ai_analysis"
+              sequence="10"/>
+
+</odoo>
