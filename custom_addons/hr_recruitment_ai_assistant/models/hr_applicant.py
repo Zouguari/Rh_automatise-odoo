@@ -987,9 +987,6 @@ class HrApplicant(models.Model):
 
         for applicant in self:
             if applicant.emp_id:
-                # Lien permanent bidirectionnel
-                applicant.emp_id.sudo().write({'applicant_id': applicant.id})
-
                 # Service réutilisable : transfert des données IA du recrutement
                 applicant._transfer_ai_recruitment_data_to_employee(applicant.emp_id)
 

@@ -11,7 +11,7 @@
             <xpath expr="//div[@name='button_box']" position="inside">
                 <button name="action_view_origin_applicant" type="object"
                         class="oe_stat_button" icon="fa-user-tie"
-                        invisible="not applicant_id">
+                        invisible="not origin_applicant_id">
                     <field name="applicant_count" widget="statinfo" string="Candidature IA"/>
                 </button>
 
@@ -48,7 +48,7 @@
                 <page string="Lifecycle &amp; Recrutement IA" name="ai_lifecycle">
                     <group>
                         <group string="Synthèse du Recrutement IA">
-                            <field name="applicant_id" readonly="1"/>
+                            <field name="origin_applicant_id" readonly="1"/>
                             <field name="ai_recruitment_score" widget="progressbar"/>
                             <field name="onboarding_ai_completed" readonly="1"/>
                             <field name="onboarding_ai_date" readonly="1"/>

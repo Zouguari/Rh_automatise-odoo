@@ -9,14 +9,15 @@ _logger = logging.getLogger(__name__)
 class HrEmployee(models.Model):
     _inherit = 'hr.employee'
 
-    applicant_id = fields.Many2one(
+    origin_applicant_id = fields.Many2one(
         'hr.applicant',
         string="Candidature IA d'origine",
+        compute='_compute_origin_applicant_id',
+        store=True,
         readonly=True,
-        copy=False,
-        ondelete='set null',
         help="Lien permanent vers la candidature ayant donné naissance à cet employé."
     )
+
     ai_recruitment_score = fields.Float(
         string="Score IA Recrutement",
         readonly=True,
@@ -88,9 +89,14 @@ class HrEmployee(models.Model):
         compute='_compute_lifecycle_counts',
     )
 
+    @api.depends('applicant_id')
+    def _compute_origin_applicant_id(self):
+        for emp in self:
+            emp.origin_applicant_id = emp.applicant_id[:1] if emp.applicant_id else False
+
     def _compute_lifecycle_counts(self):
         for emp in self:
-            emp.applicant_count = 1 if emp.applicant_id else 0
+            emp.applicant_count = len(emp.applicant_id) if emp.applicant_id else 0
 
             # Évaluations IA
             if 'hr.appraisal' in self.env:
@@ -129,13 +135,14 @@ class HrEmployee(models.Model):
     # Navigation Actions for Smart Buttons
     def action_view_origin_applicant(self):
         self.ensure_one()
-        if not self.applicant_id:
+        applicant = self.origin_applicant_id or (self.applicant_id[:1] if self.applicant_id else False)
+        if not applicant:
             return {}
         return {
             'name': "Candidature d'origine",
             'type': 'ir.actions.act_window',
             'res_model': 'hr.applicant',
-            'res_id': self.applicant_id.id,
+            'res_id': applicant.id,
             'view_mode': 'form',
             'target': 'current',
         }
