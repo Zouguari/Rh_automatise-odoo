@@ -1,2 +1,4 @@
 id,name,model_id/id,group_id/id,perm_read,perm_write,perm_create,perm_unlink
 access_api_auth_token_system,api.auth.token.system,model_api_auth_token,base.group_system,1,1,1,1
+access_smart_hr_ai_dashboard_user,smart.hr.ai.dashboard.user,model_smart_hr_ai_dashboard,base.group_user,1,1,1,1
+

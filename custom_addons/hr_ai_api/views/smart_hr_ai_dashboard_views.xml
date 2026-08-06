@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_smart_hr_ai_dashboard_form" model="ir.ui.view">
+        <field name="name">smart.hr.ai.dashboard.form</field>
+        <field name="model">smart.hr.ai.dashboard</field>
+        <field name="arch" type="xml">
+            <form string="Tableau de Bord Global Smart HR AI" create="false" delete="false">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Statistiques de Recrutement &amp; Onboarding">
+                            <field name="recruited_employees_count"/>
+                            <field name="onboarded_employees_count"/>
+                            <field name="onboarding_completion_rate" widget="progressbar"/>
+                        </group>
+                        <group string="Performance IA &amp; Compétences">
+                            <field name="avg_recruitment_ai_score" widget="progressbar"/>
+                            <field name="avg_skills_coverage" widget="progressbar"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info mt-3" role="status">
+                        <strong>ℹ️ Indicateurs d'intégration Lifecycle :</strong> Les statistiques ci-dessus sont mises à jour dynamiquement à partir des données de Recrutement IA, Onboarding Automatique, Évaluations de compétences et Évaluations de performance.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_smart_hr_ai_dashboard" model="ir.actions.act_window">
+        <field name="name">Tableau de bord IA</field>
+        <field name="res_model">smart.hr.ai.dashboard</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+    </record>
+</odoo>

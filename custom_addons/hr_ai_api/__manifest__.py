@@ -20,6 +20,7 @@
     'depends': [
         'base',
         'hr',
+        'hr_recruitment_ai_assistant',
         'hr_holidays',
         'hr_leaves_ai',
         'hr_attendance',
@@ -33,6 +34,7 @@
     },
     'data': [
         'security/ir.model.access.csv',
+        'views/smart_hr_ai_dashboard_views.xml',
         'views/smart_hr_ai_menus.xml',
     ],
     'demo': [],

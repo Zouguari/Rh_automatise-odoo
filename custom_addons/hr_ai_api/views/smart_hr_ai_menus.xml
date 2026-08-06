@@ -7,6 +7,12 @@
               parent="hr.menu_hr_root"
               sequence="5"/>
 
+    <menuitem id="menu_smart_hr_ai_dashboard"
+              name="Tableau de bord IA"
+              parent="menu_smart_hr_ai_root"
+              action="action_smart_hr_ai_dashboard"
+              sequence="1"/>
+
     <menuitem id="menu_smart_hr_ai_leaves"
               name="Congés IA"
               parent="menu_smart_hr_ai_root"
