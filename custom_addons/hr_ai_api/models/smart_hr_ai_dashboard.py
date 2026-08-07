@@ -58,6 +58,16 @@ class SmartHrAiDashboard(models.Model):
         compute='_compute_dashboard_metrics'
     )
 
+    @api.model
+    def default_get(self, fields_list):
+        res = super().default_get(fields_list)
+        dummy = self.new({})
+        dummy._compute_dashboard_metrics()
+        for fname in fields_list:
+            if hasattr(dummy, fname) and getattr(dummy, fname) is not None:
+                res[fname] = getattr(dummy, fname)
+        return res
+
     def _compute_dashboard_metrics(self):
         for dash in self:
             employees = self.env['hr.employee'].sudo().search([])

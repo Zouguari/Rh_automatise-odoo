@@ -42,11 +42,17 @@
         </field>
     </record>
 
-    <!-- Server Action pour charger automatiquement le record d'ensemble #1 -->
-    <record id="action_smart_hr_ai_dashboard" model="ir.actions.server">
+    <!-- Record singleton par défaut chargé par l'action act_window -->
+    <record id="smart_hr_ai_dashboard_default" model="smart.hr.ai.dashboard">
+        <field name="name">Vue d'ensemble Smart HR AI</field>
+    </record>
+
+    <!-- Action Fenêtre (ir.actions.act_window) standard pointant sur le record singleton -->
+    <record id="action_smart_hr_ai_dashboard" model="ir.actions.act_window">
         <field name="name">Tableau de bord IA</field>
-        <field name="model_id" ref="model_smart_hr_ai_dashboard"/>
-        <field name="state">code</field>
-        <field name="code">action = model.action_open_dashboard()</field>
+        <field name="res_model">smart.hr.ai.dashboard</field>
+        <field name="res_id" ref="smart_hr_ai_dashboard_default"/>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
     </record>
 </odoo>
