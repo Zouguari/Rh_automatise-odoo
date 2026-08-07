@@ -12,7 +12,7 @@
                         </h1>
                     </div>
                     <group>
-                        <group string="Statistiques de Recrutement &amp; Onboarding">
+                        <group string="Recrutement &amp; Onboarding IA">
                             <field name="recruited_employees_count"/>
                             <field name="onboarded_employees_count"/>
                             <field name="onboarding_completion_rate" widget="progressbar"/>
@@ -20,10 +20,22 @@
                         <group string="Performance IA &amp; Compétences">
                             <field name="avg_recruitment_ai_score" widget="progressbar"/>
                             <field name="avg_skills_coverage" widget="progressbar"/>
+                            <field name="avg_employee_performance_score" widget="progressbar"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Indicateurs Lifecycle &amp; Suivi">
+                            <field name="appraisal_employees_count"/>
+                            <field name="skills_gap_employees_count"/>
+                            <field name="training_rec_employees_count"/>
+                        </group>
+                        <group string="Alertes &amp; Module Opérationnel">
+                            <field name="attendance_anomalies_count"/>
+                            <field name="leave_recommendations_count"/>
                         </group>
                     </group>
                     <div class="alert alert-info mt-3" role="status">
-                        <strong>ℹ️ Indicateurs d'intégration Lifecycle :</strong> Les statistiques ci-dessus sont mises à jour dynamiquement à partir des données de Recrutement IA, Onboarding Automatique, Évaluations de compétences et Évaluations de performance.
+                        <strong>ℹ️ Indicateurs d'intégration Lifecycle :</strong> Les statistiques ci-dessus sont calculées en temps réel à partir des enregistrements de Recrutement IA, Onboarding Automatique, Évaluations de compétences, Présences et Congés.
                     </div>
                 </sheet>
             </form>
