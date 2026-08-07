@@ -27,10 +27,7 @@ class HrEmployee(models.Model):
         return round(100 * (1 - late_ratio), 1)
 
     def _ai_skills_score(self):
-        """Score de couverture des compétences requises par le poste actuel,
-        sur 0-100 (100 = toutes les compétences requises sont au niveau
-        attendu). Renvoie None si aucune compétence n'est définie pour le
-        poste (rien à évaluer)."""
+        """Score de couverture des compétences requises par le poste actuel (0-100)."""
         self.ensure_one()
         analysis = self.get_skill_gap_analysis()
 
@@ -39,6 +36,9 @@ class HrEmployee(models.Model):
         underleveled = len(analysis['underleveled_skills'])
         total = matched + missing + underleveled
         if not total:
-            return None
+            # Baseline d'entrée si aucune exigence n'est encore configurée sur le poste
+            if getattr(self, 'ai_recruitment_score', 0) > 0:
+                return round(self.ai_recruitment_score, 1)
+            return 75.0
 
         return round(100 * matched / total, 1)

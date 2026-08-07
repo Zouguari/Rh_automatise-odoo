@@ -33,7 +33,12 @@ class HrEmployee(models.Model):
             }
 
         required = self.env['hr.job.skill'].sudo().search([('job_id', '=', job.id)])
-        current_by_skill = {s.skill_id.id: s for s in self.employee_skill_ids}
+        current_by_skill = {s.skill_id.id: s for s in getattr(self, 'employee_skill_ids', [])}
+
+        extracted_text = (
+            (getattr(self, 'ai_extracted_skills', '') or '') + " " +
+            (getattr(self, 'ai_extracted_technologies', '') or '')
+        ).lower()
 
         missing = []
         underleveled = []
@@ -41,16 +46,19 @@ class HrEmployee(models.Model):
 
         for req in required:
             current = current_by_skill.get(req.skill_id.id)
-            if not current:
-                missing.append(req.skill_id.name)
-            elif current.skill_level_id.level_progress < req.required_level_id.level_progress:
-                underleveled.append({
-                    'skill': req.skill_id.name,
-                    'current_level': current.skill_level_id.name,
-                    'required_level': req.required_level_id.name,
-                })
-            else:
+            if current:
+                if current.skill_level_id.level_progress < req.required_level_id.level_progress:
+                    underleveled.append({
+                        'skill': req.skill_id.name,
+                        'current_level': current.skill_level_id.name,
+                        'required_level': req.required_level_id.name,
+                    })
+                else:
+                    matched.append(req.skill_id.name)
+            elif req.skill_id.name and req.skill_id.name.lower() in extracted_text:
                 matched.append(req.skill_id.name)
+            else:
+                missing.append(req.skill_id.name)
 
         gap_skill_names = missing + [u['skill'] for u in underleveled]
         courses = self.env['hr.training.course'].sudo().search([
