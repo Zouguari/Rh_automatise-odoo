@@ -61,11 +61,23 @@ class SmartHrAiDashboard(models.Model):
     @api.model
     def default_get(self, fields_list):
         res = super().default_get(fields_list)
+        # Use a fresh record to compute metrics, then read directly from cache
+        # to avoid recursion: getattr on compute fields calls __get__ → default_get → loop
         dummy = self.new({})
         dummy._compute_dashboard_metrics()
+        compute_fields = {
+            'recruited_employees_count', 'onboarded_employees_count',
+            'onboarding_completion_rate', 'avg_recruitment_ai_score',
+            'avg_skills_coverage', 'avg_employee_performance_score',
+            'appraisal_employees_count', 'skills_gap_employees_count',
+            'training_rec_employees_count', 'attendance_anomalies_count',
+            'leave_recommendations_count',
+        }
         for fname in fields_list:
-            if hasattr(dummy, fname) and getattr(dummy, fname) is not None:
-                res[fname] = getattr(dummy, fname)
+            if fname in compute_fields:
+                val = dummy._cache.get(fname)
+                if val is not None:
+                    res[fname] = val
         return res
 
     def _compute_dashboard_metrics(self):
