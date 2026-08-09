@@ -13,7 +13,7 @@ services:
       - HOST=db
       - USER=odoo
       - PASSWORD=odoo
-    command: ["odoo", "--database=RH-module", "--db-filter=RH-module"]
+    command: ["odoo", "--database=rhDatabase", "--db-filter=^rhDatabase$"]
   db:
     image: postgres:15
     environment:
@@ -26,3 +26,4 @@ services:
 volumes:
   odoo-web-data:
   odoo-db-data:
+  
