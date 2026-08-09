@@ -13,6 +13,12 @@
               action="action_smart_hr_ai_dashboard"
               sequence="1"/>
 
+    <menuitem id="menu_smart_hr_ai_weekly_summary"
+              name="Résumés hebdomadaires RH"
+              parent="menu_smart_hr_ai_root"
+              action="action_hr_weekly_summary"
+              sequence="2"/>
+
     <menuitem id="menu_smart_hr_ai_leaves"
               name="Congés IA"
               parent="menu_smart_hr_ai_root"

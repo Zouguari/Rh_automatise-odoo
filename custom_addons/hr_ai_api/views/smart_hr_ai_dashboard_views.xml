@@ -37,6 +37,20 @@
                     <div class="alert alert-info mt-3" role="status">
                         <strong>ℹ️ Indicateurs d'intégration Lifecycle :</strong> Les statistiques ci-dessus sont calculées en temps réel à partir des enregistrements de Recrutement IA, Onboarding Automatique, Évaluations de compétences, Présences et Congés.
                     </div>
+
+                    <div class="alert alert-secondary mt-3 d-flex justify-content-between align-items-center" role="status" invisible="not latest_weekly_summary_id">
+                        <div>
+                            <strong>🗓️ Résumé hebdomadaire RH :</strong>
+                            <field name="latest_weekly_summary_headline" readonly="1" nolabel="1" class="ms-1"/>
+                        </div>
+                        <button name="action_open_latest_weekly_summary" type="object"
+                                string="Voir le résumé complet" class="btn btn-link"/>
+                    </div>
+                    <div class="alert alert-secondary mt-3" role="status" invisible="latest_weekly_summary_id">
+                        Aucun résumé hebdomadaire généré pour le moment — voir le menu
+                        <i>Smart HR AI &gt; Résumés hebdomadaires RH</i>.
+                    </div>
+                    <field name="latest_weekly_summary_id" invisible="1"/>
                 </sheet>
             </form>
         </field>

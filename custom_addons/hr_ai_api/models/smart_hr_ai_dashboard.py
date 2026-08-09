@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import json
+
 from odoo import models, fields, api
 
 
@@ -56,6 +58,15 @@ class SmartHrAiDashboard(models.Model):
     leave_recommendations_count = fields.Integer(
         string="Demandes de Congés Traitées via IA",
         compute='_compute_dashboard_metrics'
+    )
+
+    # Résumé hebdomadaire IA (lien vers le dernier résumé toutes équipes)
+    latest_weekly_summary_id = fields.Many2one(
+        'hr.weekly.summary', string="Dernier résumé hebdomadaire",
+        compute='_compute_dashboard_metrics'
+    )
+    latest_weekly_summary_headline = fields.Char(
+        string="Résumé de la semaine", compute='_compute_dashboard_metrics'
     )
 
     @api.model
@@ -143,6 +154,22 @@ class SmartHrAiDashboard(models.Model):
             else:
                 dash.leave_recommendations_count = 0
 
+            # Dernier résumé hebdomadaire IA (toutes équipes)
+            if 'hr.weekly.summary' in self.env:
+                latest_summary = self.env['hr.weekly.summary'].sudo()._get_latest()
+                dash.latest_weekly_summary_id = latest_summary.id if latest_summary else False
+                if latest_summary and latest_summary.summary_json:
+                    try:
+                        parsed = json.loads(latest_summary.summary_json)
+                        dash.latest_weekly_summary_headline = parsed.get('headline') or latest_summary.name
+                    except json.JSONDecodeError:
+                        dash.latest_weekly_summary_headline = latest_summary.name
+                else:
+                    dash.latest_weekly_summary_headline = False
+            else:
+                dash.latest_weekly_summary_id = False
+                dash.latest_weekly_summary_headline = False
+
     @api.model
     def action_open_dashboard(self):
         dashboard = self.search([], limit=1)
@@ -156,3 +183,8 @@ class SmartHrAiDashboard(models.Model):
             'view_mode': 'form',
             'target': 'current',
         }
+
+    def action_open_latest_weekly_summary(self):
+        """Bouton du dashboard : ouvre le dernier résumé hebdomadaire RH
+        généré (toutes équipes)."""
+        return self.env['hr.weekly.summary'].action_open_latest()

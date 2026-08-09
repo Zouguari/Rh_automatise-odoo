@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_weekly_summary_tree" model="ir.ui.view">
+        <field name="name">hr.weekly.summary.tree</field>
+        <field name="model">hr.weekly.summary</field>
+        <field name="arch" type="xml">
+            <tree string="Résumés hebdomadaires RH" decoration-danger="state == 'error'" decoration-muted="state == 'draft'">
+                <field name="name"/>
+                <field name="date_from"/>
+                <field name="date_to"/>
+                <field name="department_id"/>
+                <field name="new_hires_count"/>
+                <field name="leaves_requested_count"/>
+                <field name="attendance_anomalies_count"/>
+                <field name="state" widget="badge" decoration-success="state == 'generated'" decoration-danger="state == 'error'"/>
+                <field name="generated_on"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_hr_weekly_summary_form" model="ir.ui.view">
+        <field name="name">hr.weekly.summary.form</field>
+        <field name="model">hr.weekly.summary</field>
+        <field name="arch" type="xml">
+            <form string="Résumé hebdomadaire RH">
+                <header>
+                    <button name="action_generate_summary" type="object"
+                            string="Générer le résumé IA" class="oe_highlight"
+                            confirm="Régénérer écrasera le résumé existant pour cette période. Continuer ?"/>
+                    <button name="action_send_summary_email" type="object"
+                            string="Envoyer par email aux RH"
+                            invisible="state != 'generated'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,generated"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                            <field name="department_id" options="{'no_create': True}"/>
+                        </group>
+                        <group>
+                            <field name="generated_on" readonly="1"/>
+                        </group>
+                    </group>
+
+                    <group string="Statistiques de la période">
+                        <group string="Recrutement">
+                            <field name="new_applicants_count"/>
+                            <field name="interviews_scheduled_count"/>
+                            <field name="new_hires_count"/>
+                            <field name="avg_recruitment_score_week"/>
+                        </group>
+                        <group string="Congés">
+                            <field name="leaves_requested_count"/>
+                            <field name="leaves_approve_count"/>
+                            <field name="leaves_caution_count"/>
+                            <field name="leaves_refuse_count"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Présences">
+                            <field name="attendance_anomalies_count"/>
+                            <field name="attendance_missing_checkout_count"/>
+                            <field name="attendance_repeated_lateness_count"/>
+                        </group>
+                        <group string="Performance">
+                            <field name="appraisals_generated_count"/>
+                            <field name="avg_performance_score_week"/>
+                            <field name="new_high_potentials_count"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Résumé IA">
+                            <field name="summary_html" readonly="1" options="{'safe': True}"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hr_weekly_summary_search" model="ir.ui.view">
+        <field name="name">hr.weekly.summary.search</field>
+        <field name="model">hr.weekly.summary</field>
+        <field name="arch" type="xml">
+            <search string="Résumés hebdomadaires RH">
+                <field name="name"/>
+                <field name="department_id"/>
+                <filter string="Générés" name="filter_generated" domain="[('state', '=', 'generated')]"/>
+                <filter string="Toutes équipes (sans département)" name="filter_no_dept" domain="[('department_id', '=', False)]"/>
+                <separator/>
+                <filter string="Semaine" name="groupby_week" context="{'group_by': 'date_from'}"/>
+                <filter string="Département" name="groupby_department" context="{'group_by': 'department_id'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_hr_weekly_summary" model="ir.actions.act_window">
+        <field name="name">Résumés hebdomadaires RH</field>
+        <field name="res_model">hr.weekly.summary</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_hr_weekly_summary_search"/>
+        <field name="context">{}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smart_action">Aucun résumé hebdomadaire pour le moment.</p>
+            <p>Crée un enregistrement pour une période donnée, puis clique sur
+               "Générer le résumé IA" — ou attends le résumé automatique généré
+               chaque lundi par la tâche planifiée.</p>
+        </field>
+    </record>
+</odoo>
