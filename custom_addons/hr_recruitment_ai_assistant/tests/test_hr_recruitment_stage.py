@@ -1,8 +1,28 @@
 # -*- coding: utf-8 -*-
-import os
-import sys
+"""Tests unitaires sur la configuration des étapes de recrutement
+(hr.recruitment.stage) de hr_recruitment_ai_assistant.
+
+NOTE DE MIGRATION : ce fichier testait auparavant une fonction
+`_mark_default_interview_stages(env)` définie dans hooks.py. Cette
+fonction n'existe plus : la configuration du pipeline standard a été
+généralisée de 2 étapes d'entretien à un pipeline complet de 7 étapes
+(Nouveau, Qualification initiale, Entretien RH, Entretien Technique,
+Proposition de contrat, Contrat signé, Refusé), pilotée par rôle
+(is_interview_stage / is_refusal_stage / is_contract_signed_stage) plutôt
+que par nom, et implémentée comme méthode du modèle
+hr.recruitment.stage._setup_default_pipeline_stages() (voir
+models/hr_recruitment_stage.py). hooks.post_init_hook() se contente
+désormais d'appeler cette méthode.
+
+L'import de l'ancienne fonction `_mark_default_interview_stages` faisait
+planter le CHARGEMENT DU MODULE entier (AttributeError levée à l'import
+de tests/__init__.py, avant même l'exécution d'un test), pas seulement un
+test — d'où l'échec systématique de `-u hr_recruitment_ai_assistant
+--test-enable`. Ce fichier a été réécrit pour cibler l'API réellement
+existante aujourd'hui.
+"""
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import patch
 
 try:
     from odoo.tests.common import TransactionCase, tagged
@@ -10,32 +30,72 @@ try:
 except (ImportError, AttributeError):
     HAS_ODOO = False
     TransactionCase = unittest.TestCase
+
     def tagged(*args, **kwargs):
         return lambda cls: cls
 
-# Import hooks de manière sécurisée (compatible hors-Odoo et dans Odoo)
+# Import du hook réel, de façon sécurisée (compatible hors-Odoo pour
+# l'analyse statique, et dans Odoo pour l'exécution des tests). Contrairement
+# à l'ancienne version, on n'importe plus de fonction inexistante : juste le
+# hook d'installation tel qu'il existe réellement dans hooks.py.
 try:
-    from custom_addons.hr_recruitment_ai_assistant.hooks import _mark_default_interview_stages
-except (ImportError, AttributeError):
-    import importlib.util
-    hooks_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'hooks.py'))
-    spec = importlib.util.spec_from_file_location("hooks_module", hooks_path)
-    hooks_module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(hooks_module)
-    _mark_default_interview_stages = hooks_module._mark_default_interview_stages
+    from odoo.addons.hr_recruitment_ai_assistant.hooks import post_init_hook
+except ImportError:
+    post_init_hook = None
 
 
 @tagged('post_install', '-at_install')
 class TestHrRecruitmentStage(TransactionCase):
-    """Tests unitaires Odoo pour la personnalisation des étapes de recrutement RH & IA."""
+    """Tests unitaires Odoo pour la personnalisation des étapes de
+    recrutement RH & IA (champs de rôle + configuration automatique du
+    pipeline standard)."""
 
     def setUp(self):
         super(TestHrRecruitmentStage, self).setUp()
         if HAS_ODOO and hasattr(self, 'env'):
             self.stage_model = self.env['hr.recruitment.stage']
 
+    def _clear_conflicting_stage(self, target_name, interview_type):
+        """Écarte toute étape déjà présente en base qui porte déjà le NOM
+        cible ou le RÔLE recherché, avant de mettre en place un scénario de
+        test isolé.
+
+        Nécessaire car ces tests (tag 'post_install') s'exécutent sur la
+        base APRÈS l'installation réelle du module : post_init_hook a déjà
+        appelé _setup_default_pipeline_stages() et créé les étapes
+        canoniques ('Entretien RH', 'Entretien Technique', déjà marquées
+        avec leur rôle). Sans cet écartement, un scénario qui suppose
+        "aucune étape ne porte encore ce nom/ce rôle" entre en collision
+        avec ces données réelles déjà présentes, et le test observe le
+        comportement de CETTE étape préexistante plutôt que celui du
+        scénario qu'il met en place.
+
+        On ne supprime jamais l'étape (une candidature pourrait y être
+        rattachée) : on la renomme et lui retire son rôle, ce qui suffit à
+        la sortir du champ de recherche de _setup_default_pipeline_stages().
+        Comme chaque méthode de test s'exécute dans sa propre savepoint
+        (rollback automatique par TransactionCase), cet écartement ne
+        laisse aucune trace en dehors du test courant."""
+        Stage = self.stage_model
+        conflicting = Stage.search([
+            '|',
+            ('name', '=', target_name),
+            '&', ('is_interview_stage', '=', True), ('interview_type', '=', interview_type),
+        ])
+        for i, stage in enumerate(conflicting):
+            stage.write({
+                'name': f"{stage.name} (écartée pour {self._testMethodName} #{i})",
+                'is_interview_stage': False,
+                'interview_type': False,
+            })
+
+    # ------------------------------------------------------------------
+    # 1. Champs de rôle sur hr.recruitment.stage
+    # ------------------------------------------------------------------
+
     def test_stage_interview_type_fields(self):
-        """Vérifie la création et la mise à jour des champs interview_type et is_interview_stage."""
+        """Vérifie la création et la mise à jour des champs interview_type
+        et is_interview_stage."""
         if not HAS_ODOO or not hasattr(self, 'env'):
             self.skipTest("Environnement Odoo non actif - test d'intégration ignoré en standalone.")
 
@@ -55,63 +115,116 @@ class TestHrRecruitmentStage(TransactionCase):
         self.assertTrue(stage_tech.is_interview_stage)
         self.assertEqual(stage_tech.interview_type, 'technique')
 
-    def test_post_init_hook_mark_default_interview_stages(self):
-        """Vérifie que le hook _mark_default_interview_stages renomme et configure les étapes d'entretien."""
+    # ------------------------------------------------------------------
+    # 2. _setup_default_pipeline_stages() : reprise d'un ancien nom Odoo
+    # ------------------------------------------------------------------
+
+    def test_setup_pipeline_renames_legacy_named_stage_without_duplicating(self):
+        """Si aucune étape ne porte déjà le rôle 'entretien RH'/'entretien
+        technique', mais qu'une étape porte encore un ancien nom par défaut
+        Odoo (ex: 'First Interview'), _setup_default_pipeline_stages() doit
+        RENOMMER cette étape existante et lui appliquer le rôle, plutôt que
+        d'en créer une nouvelle à côté (préserve les candidats déjà dessus)."""
         if not HAS_ODOO or not hasattr(self, 'env'):
             self.skipTest("Environnement Odoo non actif - test d'intégration ignoré en standalone.")
 
-        stage_first = self.stage_model.create({
-            'name': 'First Interview',
-            'is_interview_stage': False,
-        })
-        stage_second = self.stage_model.create({
-            'name': 'Second Interview',
-            'is_interview_stage': False,
-        })
+        Stage = self.stage_model
 
-        _mark_default_interview_stages(self.env)
+        # Écarte toute étape déjà présente en base portant soit le NOM
+        # cible ('Entretien RH'/'Entretien Technique' — typiquement déjà
+        # créées par post_init_hook lors de l'installation réelle du
+        # module), soit déjà le rôle, afin d'isoler proprement la branche
+        # "reprise d'un ancien nom Odoo" testée ici.
+        self._clear_conflicting_stage('Entretien RH', 'rh')
+        self._clear_conflicting_stage('Entretien Technique', 'technique')
 
-        stage_first.invalidate_recordset()
-        stage_second.invalidate_recordset()
+        legacy_rh = Stage.create({'name': 'First Interview'})
+        legacy_tech = Stage.create({'name': 'Second Interview'})
 
-        self.assertEqual(stage_first.name, 'Entretien RH')
-        self.assertTrue(stage_first.is_interview_stage)
-        self.assertEqual(stage_first.interview_type, 'rh')
+        Stage._setup_default_pipeline_stages()
 
-        self.assertEqual(stage_second.name, 'Entretien Technique')
-        self.assertTrue(stage_second.is_interview_stage)
-        self.assertEqual(stage_second.interview_type, 'technique')
+        legacy_rh.invalidate_recordset()
+        legacy_tech.invalidate_recordset()
 
+        self.assertEqual(legacy_rh.name, 'Entretien RH')
+        self.assertTrue(legacy_rh.is_interview_stage)
+        self.assertEqual(legacy_rh.interview_type, 'rh')
 
-class TestHrRecruitmentStageHookMock(unittest.TestCase):
-    """Test unitaire standalone (Mock) pour valider le hook _mark_default_interview_stages."""
+        self.assertEqual(legacy_tech.name, 'Entretien Technique')
+        self.assertTrue(legacy_tech.is_interview_stage)
+        self.assertEqual(legacy_tech.interview_type, 'technique')
 
-    def test_mark_default_interview_stages_mock(self):
-        mock_env = MagicMock()
-        mock_rh_stage = MagicMock()
-        mock_tech_stage = MagicMock()
+        # Aucun doublon ne doit avoir été créé pour l'un ou l'autre rôle.
+        self.assertEqual(
+            Stage.search_count([('is_interview_stage', '=', True), ('interview_type', '=', 'rh')]),
+            1,
+        )
+        self.assertEqual(
+            Stage.search_count([('is_interview_stage', '=', True), ('interview_type', '=', 'technique')]),
+            1,
+        )
 
-        def search_side_effect(domain):
-            if domain == [('name', 'in', ['First Interview', 'Premier entretien'])]:
-                return mock_rh_stage
-            elif domain == [('name', 'in', ['Second Interview', 'Second entretien', 'Deuxième entretien'])]:
-                return mock_tech_stage
-            return MagicMock(__len__=lambda self: 0)
+    # ------------------------------------------------------------------
+    # 3. _setup_default_pipeline_stages() : priorité au rôle déjà actif
+    # ------------------------------------------------------------------
 
-        mock_env['hr.recruitment.stage'].search.side_effect = search_side_effect
+    def test_setup_pipeline_does_not_touch_stage_already_carrying_role(self):
+        """Une étape qui porte DÉJÀ le rôle 'entretien RH', même sous un
+        nom personnalisé par le recruteur, ne doit jamais être renommée ni
+        dupliquée par _setup_default_pipeline_stages() — le rôle prime
+        toujours sur le nom cible."""
+        if not HAS_ODOO or not hasattr(self, 'env'):
+            self.skipTest("Environnement Odoo non actif - test d'intégration ignoré en standalone.")
 
-        _mark_default_interview_stages(mock_env)
+        Stage = self.stage_model
 
-        mock_rh_stage.write.assert_called_once_with({
-            'name': 'Entretien RH',
+        # Écarte toute étape déjà présente en base (ex: 'Entretien RH'
+        # créée par post_init_hook à l'installation réelle) avant de mettre
+        # en place NOTRE unique porteuse du rôle pour ce scénario — sinon
+        # le compte de porteurs du rôle serait faussé dès le départ par des
+        # données réelles indépendantes du scénario testé.
+        self._clear_conflicting_stage('Entretien RH', 'rh')
+
+        custom_stage = Stage.create({
+            'name': 'Entretien RH (Personnalisé)',
             'is_interview_stage': True,
             'interview_type': 'rh',
         })
-        mock_tech_stage.write.assert_called_once_with({
-            'name': 'Entretien Technique',
-            'is_interview_stage': True,
-            'interview_type': 'technique',
-        })
+
+        Stage._setup_default_pipeline_stages()
+        custom_stage.invalidate_recordset()
+
+        self.assertEqual(
+            custom_stage.name, 'Entretien RH (Personnalisé)',
+            "Le nom personnalisé d'une étape portant déjà le rôle actif ne doit jamais être écrasé.",
+        )
+        self.assertEqual(
+            Stage.search_count([('is_interview_stage', '=', True), ('interview_type', '=', 'rh')]),
+            1,
+            "Aucune deuxième étape 'Entretien RH' ne doit être créée en doublon.",
+        )
+
+    # ------------------------------------------------------------------
+    # 4. hooks.post_init_hook() délègue bien à la méthode du modèle
+    # ------------------------------------------------------------------
+
+    def test_post_init_hook_delegates_to_setup_default_pipeline_stages(self):
+        """post_init_hook(env) doit se contenter d'appeler
+        hr.recruitment.stage._setup_default_pipeline_stages() — c'est la
+        seule responsabilité du hook aujourd'hui, toute la logique de
+        configuration du pipeline vit dans la méthode du modèle."""
+        if not HAS_ODOO or not hasattr(self, 'env'):
+            self.skipTest("Environnement Odoo non actif - test d'intégration ignoré en standalone.")
+        if post_init_hook is None:
+            self.skipTest("hooks.post_init_hook n'a pas pu être importé dans cet environnement.")
+
+        with patch(
+            'odoo.addons.hr_recruitment_ai_assistant.models.hr_recruitment_stage'
+            '.HrRecruitmentStage._setup_default_pipeline_stages'
+        ) as mocked_setup:
+            post_init_hook(self.env)
+
+        mocked_setup.assert_called_once()
 
 
 if __name__ == '__main__':
