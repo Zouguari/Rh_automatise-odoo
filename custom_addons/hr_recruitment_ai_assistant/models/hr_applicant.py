@@ -983,7 +983,28 @@ class HrApplicant(models.Model):
                 if existing_emp:
                     applicant.emp_id = existing_emp.id
 
-        result = super(HrApplicant, self).create_employee_from_applicant()
+        # IMPORTANT : la méthode native d'Odoo (super) crée TOUJOURS un
+        # nouvel hr.employee et écrase applicant.emp_id, sans jamais
+        # vérifier si le champ est déjà renseigné. L'appeler
+        # inconditionnellement sur des candidatures déjà rattachées à un
+        # employé (trouvé ci-dessus, ou déjà présent avant l'appel)
+        # créerait donc un EMPLOYÉ EN DOUBLE à chaque fois — bug réel
+        # détecté le 13/08/2026 par test_recruitment_pipeline.py
+        # (test_create_employee_from_applicant_reuses_existing_employee_by_email).
+        # On ne délègue à super() que pour les candidatures qui ont
+        # RÉELLEMENT besoin d'un nouvel employé.
+        to_create = self.filtered(lambda a: not a.emp_id)
+        result = False
+        if to_create:
+            result = super(HrApplicant, to_create).create_employee_from_applicant()
+        if not result and self[:1].emp_id:
+            result = {
+                'type': 'ir.actions.act_window',
+                'res_model': 'hr.employee',
+                'res_id': self[:1].emp_id.id,
+                'view_mode': 'form',
+                'target': 'current',
+            }
 
         for applicant in self:
             if applicant.emp_id:
