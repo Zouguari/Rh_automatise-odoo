@@ -16,12 +16,13 @@ from unittest.mock import patch
 
 try:
     from odoo.tests.common import TransactionCase, tagged
-    from odoo.exceptions import ValidationError
+    from odoo.exceptions import ValidationError, UserError
     HAS_ODOO = True
 except (ImportError, AttributeError):
     HAS_ODOO = False
     TransactionCase = unittest.TestCase
     ValidationError = Exception
+    UserError = Exception
     def tagged(*args, **kwargs):
         return lambda cls: cls
 
@@ -274,10 +275,12 @@ class TestRecruitmentPipeline(TransactionCase):
             "Les 6 tâches d'onboarding standard doivent être créées."
         )
 
-    def test_create_employee_from_applicant_reuses_existing_employee_by_email(self):
-        """Si un employé existe déjà avec le même email professionnel, il
-        doit être RÉUTILISÉ plutôt que dupliqué (cas: personne déjà connue
-        d'un précédent contrat/mission)."""
+    def test_create_employee_from_applicant_blocks_when_active_employee_exists(self):
+        """Si un employé ACTIF existe déjà avec le même email, la conversion
+        doit être BLOQUÉE avec un message clair — pas de réutilisation
+        silencieuse (qui réapplique l'onboarding IA sur une personne déjà
+        en poste, voir docstring de create_employee_from_applicant) ni de
+        création en double."""
         if not HAS_ODOO:
             self.skipTest("Environnement Odoo non actif.")
 
@@ -290,16 +293,58 @@ class TestRecruitmentPipeline(TransactionCase):
             email_from='deja.connue.pipeline@example.com',
         )
 
-        applicant.create_employee_from_applicant()
+        employee_count_before = self.env['hr.employee'].search_count([])
 
-        self.assertEqual(
-            applicant.emp_id, existing_employee,
-            "L'employé existant doit être réutilisé, pas dupliqué."
+        with self.assertRaises(UserError):
+            applicant.create_employee_from_applicant()
+
+        self.assertFalse(
+            applicant.emp_id,
+            "La candidature ne doit PAS être rattachée à l'employé existant automatiquement."
         )
         self.assertEqual(
-            self.env['hr.employee'].search_count([('work_email', '=', 'deja.connue.pipeline@example.com')]),
-            1,
-            "Aucun employé en double ne doit être créé."
+            self.env['hr.employee'].search_count([]), employee_count_before,
+            "Aucun employé (ni doublon, ni rattachement) ne doit être créé/modifié."
+        )
+        self.assertEqual(
+            self.env['hr.appraisal'].search_count([('employee_id', '=', existing_employee.id)]), 0,
+            "Aucune évaluation ne doit être créée sur l'employé existant suite à ce blocage."
+        )
+
+    def test_reaching_contract_signed_stage_is_blocked_when_active_employee_exists(self):
+        """Reproduit le scénario réel : une personne déjà employée (poste A)
+        postule pour un second poste (poste B) et le recruteur fait avancer
+        cette 2e candidature jusqu'à 'Contrat signé'. Le changement d'étape
+        lui-même doit être bloqué (UserError remontée depuis
+        _handle_contract_signed_stage, voir le `raise` explicite sur
+        UserError dans son except) plutôt que d'avancer silencieusement en
+        laissant une note dans le chatter."""
+        if not HAS_ODOO:
+            self.skipTest("Environnement Odoo non actif.")
+
+        existing_employee = self.env['hr.employee'].create({
+            'name': 'Déjà Employé Ailleurs',
+            'work_email': 'deja.employe.pipeline@example.com',
+        })
+        second_applicant = self._create_applicant(
+            partner_name='Déjà Employé Ailleurs',
+            email_from='deja.employe.pipeline@example.com',
+            name='Candidature Poste B (Test)',
+        )
+
+        with self.assertRaises(Exception):
+            second_applicant.write({'stage_id': self.stage_contract_signed.id})
+
+        second_applicant.invalidate_recordset()
+        self.assertNotEqual(
+            second_applicant.stage_id, self.stage_contract_signed,
+            "L'étape ne doit PAS avoir avancé : le write() entier doit être annulé "
+            "(rollback), pas seulement la création d'employé."
+        )
+        self.assertFalse(second_applicant.emp_id)
+        self.assertEqual(
+            self.env['hr.appraisal'].search_count([('employee_id', '=', existing_employee.id)]), 0,
+            "L'évaluation IA de l'employé existant ne doit pas être touchée."
         )
 
 

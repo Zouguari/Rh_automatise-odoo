@@ -773,6 +773,15 @@ class HrApplicant(models.Model):
         if not self.emp_id:
             try:
                 self.create_employee_from_applicant()
+            except UserError:
+                # Erreur métier volontaire (ex : un employé actif existe déjà
+                # avec ces coordonnées) — on la laisse remonter pour BLOQUER
+                # le changement d'étape et afficher un message clair au
+                # recruteur, plutôt que de la masquer dans le chatter et
+                # laisser la candidature avancer silencieusement vers
+                # "Contrat signé" sans qu'aucun employé n'ait réellement été
+                # créé/rattaché. Voir create_employee_from_applicant().
+                raise
             except Exception as e:
                 _logger.error(
                     "Création automatique de l'employé impossible pour %s : %s",
@@ -964,8 +973,24 @@ class HrApplicant(models.Model):
         )
 
     def create_employee_from_applicant(self):
-        """Crée ou rattache un employé depuis la candidature, transfère les résultats
-        d'analyse IA, et déclenche l'onboarding IA automatique."""
+        """Crée un employé depuis la candidature, transfère les résultats
+        d'analyse IA, et déclenche l'onboarding IA automatique.
+
+        Si un EMPLOYÉ ACTIF existe déjà avec le même email ou le même nom
+        (ex : la même personne postule pour un second poste, ou une erreur
+        de saisie), on NE le réutilise PLUS silencieusement. Une première
+        version le faisait (pour éviter les employés en double), mais ça
+        revenait à réappliquer tout l'onboarding IA — nouvelle évaluation
+        de performance, tâches d'onboarding, etc. — sur une personne DÉJÀ
+        en poste, pour une candidature qui n'a souvent rien à voir avec
+        son poste actuel.
+        Bug réel constaté le 13/08/2026 : une personne recrutée comme
+        « Développeur IA » (évaluation IA à 89%) a vu son évaluation
+        écrasée par celle d'une seconde candidature « Développeur Odoo »
+        pour la même personne (89% -> 79%), sans lien avec son poste réel.
+        On bloque maintenant avec un message clair, sans toucher à
+        l'employé ni à hr.appraisal, et on laisse le recruteur traiter le
+        cas manuellement (mobilité interne, doublon de saisie...)."""
         for applicant in self:
             if not applicant.emp_id:
                 existing_emp = False
@@ -980,19 +1005,36 @@ class HrApplicant(models.Model):
                         ('name', '=ilike', applicant.partner_name.strip())
                     ], limit=1)
 
+                # NB : .search() sans with_context(active_test=False) ne
+                # trouve QUE des employés actifs (comportement Odoo par
+                # défaut) — tout match ici est donc forcément quelqu'un
+                # actuellement en poste, jamais un ancien employé archivé.
                 if existing_emp:
-                    applicant.emp_id = existing_emp.id
+                    raise UserError(
+                        "Impossible de créer un employé pour « %s » : un employé "
+                        "actif (« %s », poste : %s) existe déjà avec les mêmes "
+                        "coordonnées (email ou nom).\n\n"
+                        "Si cette candidature correspond à une mobilité interne ou "
+                        "un changement de poste pour cette personne, traitez-la "
+                        "manuellement depuis sa fiche employé plutôt que via le "
+                        "pipeline de recrutement. Si c'est une erreur de saisie "
+                        "(doublon de candidature), fusionnez ou supprimez cette "
+                        "candidature avant de continuer." % (
+                            applicant.partner_name or applicant.name,
+                            existing_emp.name,
+                            existing_emp.job_title or existing_emp.job_id.name or "non renseigné",
+                        )
+                    )
 
-        # IMPORTANT : la méthode native d'Odoo (super) crée TOUJOURS un
-        # nouvel hr.employee et écrase applicant.emp_id, sans jamais
-        # vérifier si le champ est déjà renseigné. L'appeler
-        # inconditionnellement sur des candidatures déjà rattachées à un
-        # employé (trouvé ci-dessus, ou déjà présent avant l'appel)
-        # créerait donc un EMPLOYÉ EN DOUBLE à chaque fois — bug réel
-        # détecté le 13/08/2026 par test_recruitment_pipeline.py
-        # (test_create_employee_from_applicant_reuses_existing_employee_by_email).
-        # On ne délègue à super() que pour les candidatures qui ont
-        # RÉELLEMENT besoin d'un nouvel employé.
+        # La méthode native d'Odoo (super) crée TOUJOURS un nouvel
+        # hr.employee et écrase applicant.emp_id, sans jamais vérifier si
+        # le champ est déjà renseigné. L'appeler inconditionnellement sur
+        # une candidature déjà convertie (emp_id déjà présent avant cet
+        # appel, ex : appel répété) créerait donc un EMPLOYÉ EN DOUBLE —
+        # bug réel détecté le 13/08/2026. On ne délègue à super() que pour
+        # les candidatures qui ont RÉELLEMENT besoin d'un nouvel employé
+        # (à ce stade, on sait qu'aucune ne correspond à un employé actif
+        # existant : on aurait levé une erreur juste avant).
         to_create = self.filtered(lambda a: not a.emp_id)
         result = False
         if to_create:
