@@ -18,6 +18,28 @@ _logger = logging.getLogger(__name__)
 GEMINI_MODEL = "gemini-2.5-flash"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 
+# Niveaux de maîtrise normalisés pour les compétences extraites du CV par
+# l'IA, et pourcentage cible correspondant sur l'échelle hr.skill.level
+# (level_progress, 0-100). Utilisé par hr_recruitment_ai_assistant/models/
+# hr_employee.py::_pick_skill_level_for() pour choisir, parmi les niveaux
+# RÉELLEMENT configurés pour un type de compétence donné, celui le plus
+# proche de cette cible — plutôt que d'assigner systématiquement le niveau
+# le plus bas du système à toutes les compétences (bug corrigé le 15/08/2026 :
+# un employé recruté avec 5 ans d'expérience Python se retrouvait avec
+# "Python - Débutant" sur sa fiche, quel que soit son niveau réel).
+SKILL_LEVEL_TARGET_PROGRESS = {
+    'debutant': 20,
+    'intermediaire': 50,
+    'avance': 75,
+    'expert': 95,
+}
+SKILL_LEVEL_LABELS = {
+    'debutant': "Débutant",
+    'intermediaire': "Intermédiaire",
+    'avance': "Avancé",
+    'expert': "Expert",
+}
+
 
 class GeminiRetryableError(UserError):
     """Erreur Gemini pour laquelle relancer la génération a une vraie chance
@@ -39,13 +61,39 @@ Si le CV contient 10 compétences listées, ta liste "skills" doit contenir exac
 Le JSON doit avoir exactement cette structure :
 {
   "summary": "résumé du profil en 2-3 phrases",
-  "skills": ["compétence1", "compétence2"],
+  "skills": [
+    {"name": "compétence1", "level": "avance"},
+    {"name": "compétence2", "level": "debutant"}
+  ],
   "education": ["diplôme - établissement - année"],
   "education_level_normalized": "bac_5",
   "experience": ["poste - entreprise - période - description courte"],
   "languages": ["langue (niveau)"],
   "certifications": ["certification1"]
 }
+
+Pour CHAQUE compétence de la liste "skills", évalue également un niveau de
+maîtrise à partir des indices présents dans le CV : nombre d'années
+d'expérience mentionnées avec cette compétence, mots-clés explicites
+("expert", "avancé", "maîtrise", "confirmé", "senior", "notions",
+"débutant", "junior"...), intitulé du poste occupé, importance et
+récurrence de la compétence dans les expériences décrites.
+
+"level" doit être EXACTEMENT une de ces 4 valeurs : "debutant",
+"intermediaire", "avance", "expert". Barème indicatif :
+- "debutant" : simple notion, mentionnée une fois sans contexte d'usage
+  réel, ou explicitement qualifiée de basique/débutante.
+- "intermediaire" : usage pratique réel mais limité (< 2 ans, ou projets
+  ponctuels), ou compétence mentionnée sans indice suffisant pour un
+  niveau supérieur.
+- "avance" : expérience solide et répétée (environ 2 à 5 ans), ou
+  responsabilités techniques significatives autour de cette compétence.
+- "expert" : maîtrise clairement établie (5 ans et plus, poste
+  senior/lead/architecte sur cette compétence, ou mention explicite
+  "expert"/"avancé confirmé").
+Si aucun indice de niveau n'est disponible pour une compétence donnée,
+utilise "intermediaire" par défaut — ne mets JAMAIS "debutant" faute
+d'information, ce serait sous-évaluer injustement le candidat.
 
 "education_level_normalized" doit être EXACTEMENT une de ces valeurs :
 "bac", "bac_2", "bac_3", "bac_5", "doctorat", "autre".
@@ -138,6 +186,15 @@ class HrApplicant(models.Model):
 
     # --- Données extraites du CV ---
     extracted_skills = fields.Text(string="Compétences extraites")
+    extracted_skills_detailed = fields.Text(
+        string="Compétences extraites - détail (JSON)",
+        help="Détail structuré [{'name', 'level'}] des compétences extraites du "
+             "CV par l'IA, niveau normalisé inclus (voir SKILL_LEVEL_TARGET_PROGRESS). "
+             "Champ technique utilisé pour peupler le profil de compétences Odoo de "
+             "l'employé avec un niveau réaliste lors de l'embauche — voir "
+             "hr_employee.py::_populate_employee_skills_from_ai(). Le champ "
+             "'extracted_skills' ci-dessus reste le texte lisible affiché dans le formulaire."
+    )
     extracted_education = fields.Text(string="Diplômes extraits")
     extracted_education_level = fields.Selection([
         ('bac', 'Bac'),
@@ -554,15 +611,47 @@ class HrApplicant(models.Model):
         if education_level not in allowed_levels:
             education_level = 'autre'
 
+        skills_detailed = self._normalize_extracted_skills(result.get('skills', []))
+        skills_display = [
+            f"{s['name']} ({SKILL_LEVEL_LABELS[s['level']]})" for s in skills_detailed
+        ]
+
         self.write({
             'ai_summary': result.get('summary', ''),
-            'extracted_skills': _format_list(result.get('skills', [])),
+            'extracted_skills': _format_list(skills_display),
+            'extracted_skills_detailed': json.dumps(skills_detailed, ensure_ascii=False),
             'extracted_education': _format_list(result.get('education', [])),
             'extracted_education_level': education_level,
             'extracted_experience': _format_list(result.get('experience', [])),
             'extracted_languages': _format_list(result.get('languages', [])),
             'extracted_certifications': _format_list(result.get('certifications', [])),
         })
+
+    def _normalize_extracted_skills(self, raw_skills):
+        """Normalise la liste de compétences renvoyée par Gemini vers une
+        liste de dicts {'name', 'level'} avec un niveau garanti parmi les
+        4 valeurs de SKILL_LEVEL_TARGET_PROGRESS.
+
+        Tolère un ancien format (liste de chaînes simples, sans niveau —
+        ex: réponse générée avant ce correctif et encore en cache/debug,
+        ou modèle IA qui s'écarte occasionnellement du format demandé) :
+        dans ce cas, niveau 'intermediaire' par défaut, plutôt que de faire
+        échouer tout le traitement de l'extraction pour un simple souci de
+        format sur un sous-champ non critique."""
+        normalized = []
+        for item in raw_skills or []:
+            if isinstance(item, dict):
+                name = (item.get('name') or '').strip()
+                level = (item.get('level') or '').strip().lower()
+            else:
+                name = str(item).strip()
+                level = ''
+            if not name:
+                continue
+            if level not in SKILL_LEVEL_TARGET_PROGRESS:
+                level = 'intermediaire'
+            normalized.append({'name': name, 'level': level})
+        return normalized
 
     @api.onchange('job_id')
     def _onchange_job_id_assign_recruiter(self):
@@ -1073,6 +1162,7 @@ class HrApplicant(models.Model):
             'ai_recruitment_score': self.ai_score or 0.0,
             'ai_recruitment_summary': self.ai_summary or '',
             'ai_extracted_skills': self.extracted_skills or '',
+            'ai_extracted_skills_detailed': self.extracted_skills_detailed or '',
             'ai_extracted_technologies': self.ai_matched_skills or '',
             'ai_extracted_soft_skills': self.ai_recommendation or '',
             'ai_extracted_languages': self.extracted_languages or '',

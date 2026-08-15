@@ -115,6 +115,9 @@
                     <group string="Texte brut du CV">
                         <field name="cv_raw_text" nolabel="1" colspan="2" readonly="1"/>
                     </group>
+                    <group string="Debug - Compétences extraites avec niveau (JSON)">
+                        <field name="extracted_skills_detailed" nolabel="1" colspan="2" readonly="1"/>
+                    </group>
                     <group string="Debug - Réponse brute Gemini">
                         <field name="ai_extraction_raw" nolabel="1" colspan="2" readonly="1"/>
                     </group>

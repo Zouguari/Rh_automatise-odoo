@@ -7,9 +7,9 @@ from odoo.exceptions import UserError
 # donnée déjà présente, seulement compléter ce qui manque).
 _AI_FIELDS_TO_FILL = [
     'ai_score', 'ai_summary', 'ai_recommendation', 'ai_score_explanation',
-    'extracted_skills', 'extracted_education', 'extracted_education_level',
-    'extracted_experience', 'extracted_languages', 'extracted_certifications',
-    'cv_raw_text',
+    'extracted_skills', 'extracted_skills_detailed', 'extracted_education',
+    'extracted_education_level', 'extracted_experience', 'extracted_languages',
+    'extracted_certifications', 'cv_raw_text',
 ]
 
 

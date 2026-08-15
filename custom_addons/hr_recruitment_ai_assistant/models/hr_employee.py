@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
+import json
 import logging
 import re
 from odoo import models, fields, api
+
+from .hr_applicant import SKILL_LEVEL_TARGET_PROGRESS
 
 _logger = logging.getLogger(__name__)
 
@@ -34,6 +37,16 @@ class HrEmployee(models.Model):
         string="Compétences (IA Recrutement)",
         readonly=True,
         copy=False,
+    )
+    ai_extracted_skills_detailed = fields.Text(
+        string="Compétences (IA Recrutement) - détail niveaux (JSON)",
+        readonly=True,
+        copy=False,
+        help="Détail structuré [{'name', 'level'}] transféré depuis la candidature "
+             "d'origine (hr.applicant.extracted_skills_detailed). Utilisé par "
+             "_populate_employee_skills_from_ai() pour attribuer à chaque compétence "
+             "un niveau réaliste sur le profil de compétences Odoo, au lieu du niveau "
+             "le plus bas du système appliqué uniformément (bug corrigé le 15/08/2026)."
     )
     ai_extracted_technologies = fields.Text(
         string="Technologies (IA Recrutement)",
@@ -249,22 +262,27 @@ class HrEmployee(models.Model):
                 _logger.error("Erreur lors de l'Onboarding IA pour l'employé %s : %s", emp.name, e, exc_info=True)
 
     def _populate_employee_skills_from_ai(self):
-        """Extrait les noms de compétences depuis ai_extracted_skills et ai_extracted_technologies
-        et crée les enregistrements hr.employee.skill correspondants."""
+        """Crée les enregistrements hr.employee.skill correspondant aux
+        compétences extraites du CV, avec pour chacune un NIVEAU RÉALISTE
+        déduit par l'IA à l'extraction (débutant/intermédiaire/avancé/expert),
+        plutôt que le niveau le plus bas configuré dans le système appliqué
+        uniformément à toutes les compétences de tous les employés.
+
+        Correctif du 15/08/2026 : un candidat avec 5 ans d'expérience Python
+        (CV réel testé) se retrouvait avec "Python - Débutant (15%)" sur sa
+        fiche employé après embauche, comme absolument toutes ses autres
+        compétences — l'ancien code prenait systématiquement
+        `hr.skill.level` avec le `level_progress` le plus bas du type de
+        compétence, sans aucun lien avec le contenu réel du CV. Le niveau
+        est maintenant choisi via _pick_skill_level_for(), à partir du
+        niveau estimé par Gemini lors de l'extraction (voir hr_applicant.py
+        ::EXTRACTION_PROMPT et ::_normalize_extracted_skills)."""
         self.ensure_one()
         if 'hr.skill' not in self.env or 'hr.employee.skill' not in self.env:
             return
 
-        raw_texts = [self.ai_extracted_skills or '', self.ai_extracted_technologies or '']
-        skill_names = set()
-        for text in raw_texts:
-            items = re.split(r'[,;\n•\-]+', text)
-            for item in items:
-                cleaned = item.strip()
-                if cleaned and len(cleaned) <= 60:
-                    skill_names.add(cleaned)
-
-        if not skill_names:
+        skills_detailed = self._parse_ai_skills_detailed()
+        if not skills_detailed:
             return
 
         skill_type = self.env['hr.skill.type'].sudo().search([('name', '=', 'Technique')], limit=1)
@@ -273,31 +291,138 @@ class HrEmployee(models.Model):
         if not skill_type:
             skill_type = self.env['hr.skill.type'].sudo().create({'name': 'Technique'})
 
-        skill_level = self.env['hr.skill.level'].sudo().search([('skill_type_id', '=', skill_type.id)], order='level_progress asc', limit=1)
-        if not skill_level:
-            skill_level = self.env['hr.skill.level'].sudo().create({
-                'name': 'Intermédiaire',
-                'skill_type_id': skill_type.id,
-                'level_progress': 50,
-            })
+        # Garantit une échelle d'AU MOINS 2 niveaux distincts pour ce type
+        # de compétence : avec un seul niveau configuré (ancien fallback),
+        # toute recherche du "niveau le plus proche" retombe forcément sur
+        # ce niveau unique, ce qui reproduirait exactement le bug corrigé
+        # ici. N'intervient que si le type n'a ENCORE AUCUN niveau
+        # configuré — un type déjà configuré (même avec un seul niveau
+        # volontaire) n'est jamais modifié.
+        self._ensure_default_skill_levels(skill_type)
 
         existing_skills = self.env['hr.employee.skill'].sudo().search([('employee_id', '=', self.id)])
-        existing_skill_ids = existing_skills.mapped('skill_id.id')
+        existing_skill_ids = set(existing_skills.mapped('skill_id.id'))
 
-        for name in skill_names:
+        for item in skills_detailed:
+            name = item['name']
+            level = item['level']
+            if not name or len(name) > 60:
+                continue
+
+            # Si la compétence existe déjà dans le système (catalogue
+            # standard ou créée par un autre employé), on réutilise son
+            # VRAI type de compétence plutôt que notre type de repli
+            # "Technique" — sinon le niveau choisi ensuite pourrait
+            # provenir d'une échelle qui ne correspond pas au type réel
+            # de la compétence (ex: "Python" déjà classé dans un type
+            # "Langages de programmation" avec sa propre échelle).
             skill = self.env['hr.skill'].sudo().search([('name', '=ilike', name)], limit=1)
-            if not skill:
+            if skill:
+                target_skill_type = skill.skill_type_id
+            else:
                 skill = self.env['hr.skill'].sudo().create({
                     'name': name,
                     'skill_type_id': skill_type.id,
                 })
-            if skill.id not in existing_skill_ids:
-                try:
-                    self.env['hr.employee.skill'].sudo().create({
-                        'employee_id': self.id,
-                        'skill_id': skill.id,
-                        'skill_level_id': skill_level.id,
-                        'skill_type_id': skill_type.id,
-                    })
-                except Exception as e:
-                    _logger.warning("Impossible de lier la compétence %s à l'employé %s : %s", name, self.name, e)
+                target_skill_type = skill_type
+
+            if skill.id in existing_skill_ids:
+                continue
+
+            skill_level = self._pick_skill_level_for(target_skill_type, level)
+            if not skill_level:
+                continue
+
+            try:
+                self.env['hr.employee.skill'].sudo().create({
+                    'employee_id': self.id,
+                    'skill_id': skill.id,
+                    'skill_level_id': skill_level.id,
+                    'skill_type_id': target_skill_type.id,
+                })
+            except Exception as e:
+                _logger.warning(
+                    "Impossible de lier la compétence %s (niveau estimé : %s) "
+                    "à l'employé %s : %s", name, level, self.name, e,
+                )
+
+    def _parse_ai_skills_detailed(self):
+        """Renvoie la liste [{'name', 'level'}] des compétences extraites du
+        CV par l'IA au recrutement.
+
+        Utilise en priorité le détail structuré transféré depuis la
+        candidature d'origine (ai_extracted_skills_detailed, alimenté par
+        hr.applicant.extracted_skills_detailed — voir _transfer_ai_
+        recruitment_data_to_employee dans hr_applicant.py). Si ce détail
+        est absent ou illisible (ex : employé créé avant ce correctif, ou
+        sans passage par le pipeline IA de recrutement), on retombe sur un
+        parsing basique du texte brut (ai_extracted_skills /
+        ai_extracted_technologies), avec un niveau 'intermediaire' par
+        défaut faute d'indice plus précis — mieux qu'un niveau bas
+        systématique, sans pour autant inventer un niveau que rien ne
+        justifie."""
+        self.ensure_one()
+        raw_json = self.ai_extracted_skills_detailed or ''
+        if raw_json:
+            try:
+                parsed = json.loads(raw_json)
+                result = []
+                for entry in parsed:
+                    name = (entry.get('name') or '').strip()
+                    level = (entry.get('level') or 'intermediaire').strip().lower()
+                    if level not in SKILL_LEVEL_TARGET_PROGRESS:
+                        level = 'intermediaire'
+                    if name:
+                        result.append({'name': name, 'level': level})
+                if result:
+                    return result
+            except (json.JSONDecodeError, AttributeError, TypeError) as e:
+                _logger.warning(
+                    "Détail JSON des compétences illisible pour %s (%s), "
+                    "retour au parsing basique du texte brut.", self.name, e,
+                )
+
+        raw_texts = [self.ai_extracted_skills or '', self.ai_extracted_technologies or '']
+        skill_names = set()
+        for text in raw_texts:
+            for chunk in re.split(r'[,;\n•\-]+', text):
+                cleaned = chunk.strip(' -')
+                if cleaned and len(cleaned) <= 60:
+                    skill_names.add(cleaned)
+        return [{'name': n, 'level': 'intermediaire'} for n in skill_names]
+
+    def _ensure_default_skill_levels(self, skill_type):
+        """Garantit qu'un type de compétence dispose d'au moins l'échelle
+        standard à 4 niveaux (Débutant/Intermédiaire/Avancé/Expert),
+        UNIQUEMENT s'il n'a actuellement AUCUN niveau configuré. N'écrase
+        et ne complète jamais une échelle déjà définie par l'utilisateur,
+        même partielle ou à un seul niveau."""
+        self.ensure_one()
+        has_levels = self.env['hr.skill.level'].sudo().search_count(
+            [('skill_type_id', '=', skill_type.id)]
+        )
+        if has_levels:
+            return
+        for name, progress in (
+            ("Débutant", 20), ("Intermédiaire", 50), ("Avancé", 75), ("Expert", 100),
+        ):
+            self.env['hr.skill.level'].sudo().create({
+                'name': name,
+                'skill_type_id': skill_type.id,
+                'level_progress': progress,
+            })
+
+    def _pick_skill_level_for(self, skill_type, level_label):
+        """Choisit, parmi les niveaux RÉELLEMENT configurés pour ce type de
+        compétence, celui dont le level_progress est le plus proche de la
+        cible associée au niveau estimé par l'IA (SKILL_LEVEL_TARGET_PROGRESS).
+        S'adapte ainsi à n'importe quelle échelle définie par l'utilisateur
+        (2, 3, 5 niveaux, valeurs personnalisées...) plutôt que de supposer
+        une échelle fixe."""
+        levels = self.env['hr.skill.level'].sudo().search(
+            [('skill_type_id', '=', skill_type.id)], order='level_progress asc'
+        )
+        if not levels:
+            return False
+        target = SKILL_LEVEL_TARGET_PROGRESS.get(level_label, 50)
+        return min(levels, key=lambda l: abs(l.level_progress - target))
