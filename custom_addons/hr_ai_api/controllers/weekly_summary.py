@@ -19,10 +19,14 @@ class HrAiApiWeeklySummaryController(http.Controller):
     @http.route('/api/v1/weekly-summary/latest', type='http', auth='none', methods=['GET'], csrf=False)
     @require_auth(['analytics:read'])
     def get_latest_weekly_summary(self, **kwargs):
+        """Renvoie le résumé le plus récent, officiel ou aperçu provisoire
+        de la semaine en cours selon lequel a été généré en dernier (voir
+        hr.weekly.summary._get_latest_any) — pas uniquement le rapport
+        officiel, qui peut être vieux de plusieurs jours."""
         department_id = kwargs.get('department_id')
         department_id = int(department_id) if department_id else None
 
-        summary = request.env['hr.weekly.summary'].sudo()._get_latest(department_id=department_id)
+        summary = request.env['hr.weekly.summary'].sudo()._get_latest_any(department_id=department_id)
         if not summary:
             return request.make_json_response(
                 {'error': 'not_found', 'message': "Aucun résumé hebdomadaire généré pour le moment."},
@@ -82,3 +86,4 @@ class HrAiApiWeeklySummaryController(http.Controller):
                 for s in summaries
             ],
         })
+    

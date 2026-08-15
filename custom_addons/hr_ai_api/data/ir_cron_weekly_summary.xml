@@ -18,5 +18,29 @@
             <field name="numbercall">-1</field>
             <field name="active">True</field>
         </record>
+
+        <!--
+            Maintient un APERÇU de la semaine en cours à jour en permanence
+            (toutes équipes confondues), pour que le dashboard et l'API
+            mobile (_get_latest_any) n'affichent jamais un résumé vieux de
+            plusieurs jours quand un événement récent (embauche, congé...)
+            n'est pas encore couvert par le rapport officiel du lundi
+            suivant. Le bouton manuel "Aperçu semaine en cours" reste
+            disponible pour un rafraîchissement immédiat à la demande, sans
+            attendre ce cron. Fréquence volontairement modérée (1x/jour)
+            pour limiter la consommation de quota Gemini ; désactive ce
+            cron si le quota est une contrainte et compte uniquement sur le
+            bouton manuel.
+        -->
+        <record id="ir_cron_generate_weekly_summary_snapshot" model="ir.cron">
+            <field name="name">Assistant RH IA : aperçu quotidien de la semaine en cours</field>
+            <field name="model_id" ref="model_hr_weekly_summary"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_generate_weekly_summary_snapshot()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="numbercall">-1</field>
+            <field name="active">True</field>
+        </record>
     </data>
 </odoo>

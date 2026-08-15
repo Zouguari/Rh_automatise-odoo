@@ -43,12 +43,18 @@
                             <strong>🗓️ Résumé hebdomadaire RH :</strong>
                             <field name="latest_weekly_summary_headline" readonly="1" nolabel="1" class="ms-1"/>
                         </div>
-                        <button name="action_open_latest_weekly_summary" type="object"
-                                string="Voir le résumé complet" class="btn btn-link"/>
+                        <div>
+                            <button name="action_open_latest_weekly_summary" type="object"
+                                    string="Voir le résumé complet" class="btn btn-link"/>
+                            <button name="action_generate_current_week_snapshot" type="object"
+                                    string="🔄 Aperçu semaine en cours" class="btn btn-link"
+                                    help="Génère (ou régénère) un aperçu à jour de la semaine en cours, toutes équipes confondues — utile juste après un événement du jour (embauche, congé...) sans attendre le rapport officiel du lundi suivant."/>
+                        </div>
                     </div>
                     <div class="alert alert-secondary mt-3" role="status" invisible="latest_weekly_summary_id">
-                        Aucun résumé hebdomadaire généré pour le moment — voir le menu
-                        <i>Smart HR AI &gt; Résumés hebdomadaires RH</i>.
+                        Aucun résumé hebdomadaire généré pour le moment.
+                        <button name="action_generate_current_week_snapshot" type="object"
+                                string="Générer un aperçu de la semaine en cours" class="btn btn-link"/>
                     </div>
                     <field name="latest_weekly_summary_id" invisible="1"/>
                 </sheet>

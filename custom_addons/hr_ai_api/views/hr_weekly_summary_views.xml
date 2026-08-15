@@ -6,10 +6,12 @@
         <field name="arch" type="xml">
             <tree string="Résumés hebdomadaires RH" decoration-danger="state == 'error'" decoration-muted="state == 'draft'">
                 <field name="name"/>
+                <field name="period_type" widget="badge" decoration-info="period_type == 'current_week_to_date'"/>
                 <field name="date_from"/>
                 <field name="date_to"/>
                 <field name="department_id"/>
                 <field name="new_hires_count"/>
+                <field name="new_hires_via_ai_pipeline_count" optional="hide"/>
                 <field name="leaves_requested_count"/>
                 <field name="attendance_anomalies_count"/>
                 <field name="state" widget="badge" decoration-success="state == 'generated'" decoration-danger="state == 'error'"/>
@@ -27,17 +29,26 @@
                     <button name="action_generate_summary" type="object"
                             string="Générer le résumé IA" class="oe_highlight"
                             confirm="Régénérer écrasera le résumé existant pour cette période. Continuer ?"/>
+                    <button name="action_open_or_generate_current_week_snapshot" type="object"
+                            string="Aperçu semaine en cours (à jour)"
+                            help="Génère un aperçu provisoire à jour de la semaine en cours pour ce département, sans attendre la clôture de la semaine ni le prochain passage du cron."/>
                     <button name="action_send_summary_email" type="object"
                             string="Envoyer par email aux RH"
                             invisible="state != 'generated'"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,generated"/>
                 </header>
                 <sheet>
+                    <div class="alert alert-warning mt-2" role="status" invisible="period_type != 'current_week_to_date'">
+                        <strong>⚠️ Aperçu provisoire :</strong> cette semaine n'est pas encore terminée.
+                        Ces chiffres peuvent encore évoluer avant la clôture officielle de la semaine
+                        (rapport généré automatiquement chaque lundi).
+                    </div>
                     <div class="oe_title">
                         <h1><field name="name" readonly="1"/></h1>
                     </div>
                     <group>
                         <group>
+                            <field name="period_type"/>
                             <field name="date_from"/>
                             <field name="date_to"/>
                             <field name="department_id" options="{'no_create': True}"/>
@@ -52,6 +63,7 @@
                             <field name="new_applicants_count"/>
                             <field name="interviews_scheduled_count"/>
                             <field name="new_hires_count"/>
+                            <field name="new_hires_via_ai_pipeline_count"/>
                             <field name="avg_recruitment_score_week"/>
                         </group>
                         <group string="Congés">
@@ -78,6 +90,14 @@
                         <page string="Résumé IA">
                             <field name="summary_html" readonly="1" options="{'safe': True}"/>
                         </page>
+                        <page string="Détail (traçabilité)">
+                            <group>
+                                <field name="new_hires_detail" nolabel="1" colspan="2" readonly="1"/>
+                            </group>
+                            <group string="Postes ayant reçu des candidatures">
+                                <field name="top_recruiting_jobs" nolabel="1" colspan="2" readonly="1"/>
+                            </group>
+                        </page>
                     </notebook>
                 </sheet>
                 <div class="oe_chatter">
@@ -95,10 +115,13 @@
                 <field name="name"/>
                 <field name="department_id"/>
                 <filter string="Générés" name="filter_generated" domain="[('state', '=', 'generated')]"/>
+                <filter string="Rapports officiels" name="filter_official" domain="[('period_type', '!=', 'current_week_to_date')]"/>
+                <filter string="Aperçus semaine en cours" name="filter_snapshots" domain="[('period_type', '=', 'current_week_to_date')]"/>
                 <filter string="Toutes équipes (sans département)" name="filter_no_dept" domain="[('department_id', '=', False)]"/>
                 <separator/>
                 <filter string="Semaine" name="groupby_week" context="{'group_by': 'date_from'}"/>
                 <filter string="Département" name="groupby_department" context="{'group_by': 'department_id'}"/>
+                <filter string="Type de période" name="groupby_period_type" context="{'group_by': 'period_type'}"/>
             </search>
         </field>
     </record>
@@ -113,7 +136,10 @@
             <p class="o_view_nocontent_smart_action">Aucun résumé hebdomadaire pour le moment.</p>
             <p>Crée un enregistrement pour une période donnée, puis clique sur
                "Générer le résumé IA" — ou attends le résumé automatique généré
-               chaque lundi par la tâche planifiée.</p>
+               chaque lundi par la tâche planifiée. Pour un aperçu à jour de la
+               semaine en cours (ex : juste après une embauche), utilise le
+               bouton "Aperçu semaine en cours (à jour)" sur une fiche existante,
+               ou le bouton dédié du Tableau de bord IA.</p>
         </field>
     </record>
 </odoo>

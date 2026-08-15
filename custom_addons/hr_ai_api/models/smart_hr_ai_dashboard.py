@@ -168,7 +168,14 @@ class SmartHrAiDashboard(models.Model):
 
             # Dernier résumé hebdomadaire IA (toutes équipes)
             if 'hr.weekly.summary' in self.env:
-                latest_summary = self.env['hr.weekly.summary'].sudo()._get_latest()
+                # _get_latest_any() renvoie le plus récent des deux TYPES de
+                # résumé (rapport officiel de la dernière semaine complète,
+                # OU aperçu provisoire de la semaine en cours) — pas
+                # uniquement le rapport officiel. Avant ce correctif, le
+                # dashboard pouvait afficher un résumé vieux de plusieurs
+                # jours/semaines même si un aperçu bien plus frais existait
+                # (ex: généré juste après une embauche du jour).
+                latest_summary = self.env['hr.weekly.summary'].sudo()._get_latest_any()
                 dash.latest_weekly_summary_id = latest_summary.id if latest_summary else False
                 if latest_summary and latest_summary.summary_json:
                     try:
@@ -197,6 +204,15 @@ class SmartHrAiDashboard(models.Model):
         }
 
     def action_open_latest_weekly_summary(self):
-        """Bouton du dashboard : ouvre le dernier résumé hebdomadaire RH
-        généré (toutes équipes)."""
+        """Bouton du dashboard : ouvre le résumé hebdomadaire RH le plus
+        récent (officiel ou aperçu provisoire, toutes équipes)."""
         return self.env['hr.weekly.summary'].action_open_latest()
+
+    def action_generate_current_week_snapshot(self):
+        """Bouton du dashboard : génère (ou régénère) en un clic un aperçu
+        RH à jour de la semaine en cours, toutes équipes confondues, et
+        l'ouvre directement — sans attendre le prochain passage du cron
+        hebdomadaire ni celui du cron quotidien d'aperçu. Cas d'usage
+        typique : une embauche vient d'avoir lieu et on veut voir
+        immédiatement son effet sur le résumé RH."""
+        return self.env['hr.weekly.summary'].action_open_or_generate_current_week_snapshot()
