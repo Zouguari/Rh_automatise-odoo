@@ -64,3 +64,24 @@ class HrDocumentRequest(models.Model):
         if 'status' in vals and vals['status'] in ('ready', 'delivered', 'rejected'):
             vals['processed_date'] = fields.Datetime.now()
         return super(HrDocumentRequest, self).write(vals)
+
+    # Action buttons for HR Back-Office
+    def action_process(self):
+        for rec in self:
+            rec.write({'status': 'processing'})
+
+    def action_ready(self):
+        for rec in self:
+            rec.write({'status': 'ready', 'processed_date': fields.Datetime.now()})
+
+    def action_deliver(self):
+        for rec in self:
+            rec.write({'status': 'delivered', 'processed_date': fields.Datetime.now()})
+
+    def action_reject(self):
+        for rec in self:
+            rec.write({'status': 'rejected', 'processed_date': fields.Datetime.now()})
+
+    def action_reset_pending(self):
+        for rec in self:
+            rec.write({'status': 'pending'})

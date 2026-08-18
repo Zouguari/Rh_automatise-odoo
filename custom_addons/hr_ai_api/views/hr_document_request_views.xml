@@ -7,7 +7,12 @@
         <field name="arch" type="xml">
             <form string="Demande de document administratif">
                 <header>
-                    <field name="status" widget="statusbar" statusbar_visible="pending,processing,ready,delivered"/>
+                    <button name="action_process" string="Prendre en charge" type="object" class="oe_highlight" invisible="status != 'pending'"/>
+                    <button name="action_ready" string="Marquer comme Prêt" type="object" class="oe_highlight" invisible="status != 'processing'"/>
+                    <button name="action_deliver" string="Marquer comme Délivré" type="object" class="oe_highlight" invisible="status == 'delivered'"/>
+                    <button name="action_reject" string="Refuser" type="object" invisible="status in ('delivered', 'rejected')"/>
+                    <button name="action_reset_pending" string="Remettre en attente" type="object" invisible="status == 'pending'"/>
+                    <field name="status" widget="statusbar" options="{'clickable': '1'}" statusbar_visible="pending,processing,ready,delivered"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
