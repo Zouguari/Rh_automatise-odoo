@@ -43,6 +43,7 @@
         'views/hr_weekly_summary_views.xml',
         'views/hr_employee_credentials_views.xml',
         'views/hr_employee_credentials_reset_wizard_views.xml',
+        'views/hr_document_request_views.xml',
         'views/smart_hr_ai_menus.xml',
     ],
     'demo': [],

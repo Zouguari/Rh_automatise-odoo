@@ -8,4 +8,7 @@ access_hr_employee_credentials_manager,hr.employee.credentials.manager,model_hr_
 access_hr_employee_credentials_user,hr.employee.credentials.user,model_hr_employee_credentials,hr.group_hr_user,1,1,1,0
 access_hr_employee_credentials_reset_wizard_system,hr.employee.credentials.reset.wizard.system,model_hr_employee_credentials_reset_wizard,base.group_system,1,1,1,1
 access_hr_employee_credentials_reset_wizard_user,hr.employee.credentials.reset.wizard.user,model_hr_employee_credentials_reset_wizard,base.group_user,1,1,1,1
+access_hr_document_request_system,hr.document.request.system,model_hr_document_request,base.group_system,1,1,1,1
+access_hr_document_request_manager,hr.document.request.manager,model_hr_document_request,hr.group_hr_manager,1,1,1,1
+access_hr_document_request_user,hr.document.request.user,model_hr_document_request,base.group_user,1,1,1,1
 

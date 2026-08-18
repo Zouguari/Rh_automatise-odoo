@@ -6,3 +6,4 @@ from . import attendance
 from . import skills
 from . import appraisals
 from . import weekly_summary
+from . import documents
