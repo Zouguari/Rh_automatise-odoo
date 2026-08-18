@@ -3,7 +3,7 @@ import json
 import logging
 import base64
 
-from odoo import http
+from odoo import http, SUPERUSER_ID
 from odoo.http import request
 from ..utils.auth_decorator import require_auth
 
@@ -88,7 +88,8 @@ class HrDocumentRequestController(http.Controller):
             'status': 'pending',
         }
 
-        rec = request.env['hr.document.request'].sudo().create(vals)
+        # Use with_user(SUPERUSER_ID) to ensure mail thread / chatter has valid env.user
+        rec = request.env['hr.document.request'].with_user(SUPERUSER_ID).create(vals)
 
         return request.make_json_response({
             'success': True,

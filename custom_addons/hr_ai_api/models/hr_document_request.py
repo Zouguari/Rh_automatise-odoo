@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import api, fields, models
+from odoo import api, fields, models, SUPERUSER_ID
 
 
 class HrDocumentRequest(models.Model):
@@ -50,11 +50,14 @@ class HrDocumentRequest(models.Model):
     def create(self, vals_list):
         records = super(HrDocumentRequest, self).create(vals_list)
         for rec in records:
-            rec.message_post(
-                body="📄 Nouvelle demande de document administrative créée : <b>%s</b>." % (
-                    dict(rec._fields['document_type'].selection).get(rec.document_type)
+            try:
+                rec.with_user(SUPERUSER_ID).message_post(
+                    body="📄 Nouvelle demande de document administrative créée : <b>%s</b>." % (
+                        dict(rec._fields['document_type'].selection).get(rec.document_type)
+                    )
                 )
-            )
+            except Exception:
+                pass
         return records
 
     def write(self, vals):
