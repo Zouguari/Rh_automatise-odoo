@@ -36,14 +36,19 @@ def get_jwt_secret(env):
     return secret
 
 
-def encode_access_token(env, user, employee, scopes, role):
-    """Construit et signe l'access token JWT pour un utilisateur authentifié."""
+def encode_access_token(env, user, employee, scopes, role, must_change_password=False):
+    """Construit et signe l'access token JWT pour un utilisateur ou employé authentifié."""
     now = datetime.now(timezone.utc)
+    user_id = user.id if user else False
+    employee_id = employee.id if employee else False
+
     payload = {
-        'sub': str(user.id),
-        'employee_id': employee.id if employee else False,
+        'sub': str(user.id) if user else (str(employee_id) if employee_id else '0'),
+        'user_id': user_id,
+        'employee_id': employee_id,
         'scopes': scopes,
         'role': role,
+        'must_change_password': must_change_password,
         'iat': now,
         'exp': now + timedelta(minutes=ACCESS_TOKEN_TTL_MINUTES),
     }

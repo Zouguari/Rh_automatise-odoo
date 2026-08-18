@@ -8,7 +8,11 @@ class ApiAuthToken(models.Model):
     _order = 'create_date desc'
 
     user_id = fields.Many2one(
-        'res.users', string="Utilisateur", required=True, index=True,
+        'res.users', string="Utilisateur", required=False, index=True,
+        ondelete='cascade',
+    )
+    employee_id = fields.Many2one(
+        'hr.employee', string="Employé", required=False, index=True,
         ondelete='cascade',
     )
     token_hash = fields.Char(

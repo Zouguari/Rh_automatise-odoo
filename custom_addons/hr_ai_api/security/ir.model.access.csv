@@ -3,4 +3,7 @@ access_api_auth_token_system,api.auth.token.system,model_api_auth_token,base.gro
 access_smart_hr_ai_dashboard_user,smart.hr.ai.dashboard.user,model_smart_hr_ai_dashboard,base.group_user,1,1,1,1
 access_hr_weekly_summary_user,hr.weekly.summary.user,model_hr_weekly_summary,hr.group_hr_user,1,1,1,0
 access_hr_weekly_summary_manager,hr.weekly.summary.manager,model_hr_weekly_summary,hr.group_hr_manager,1,1,1,1
+access_hr_employee_credentials_system,hr.employee.credentials.system,model_hr_employee_credentials,base.group_system,1,1,1,1
+access_hr_employee_credentials_manager,hr.employee.credentials.manager,model_hr_employee_credentials,hr.group_hr_manager,1,1,1,1
+access_hr_employee_credentials_user,hr.employee.credentials.user,model_hr_employee_credentials,hr.group_hr_user,1,1,1,0
 

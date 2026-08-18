@@ -22,49 +22,61 @@ _logger = logging.getLogger(__name__)
 
 class HrAiApiAuthController(http.Controller):
 
-    # NOTE : type='http' (et non 'json'). Le type 'json' d'Odoo implémente
-    # le protocole JSON-RPC 2.0 (enveloppe {"jsonrpc","method","params"} en
-    # entrée, {"jsonrpc","id","result"} en sortie) — inadapté à une API REST
-    # consommée par une app mobile. En 'http', on lit et on écrit du JSON
-    # "brut" nous-mêmes, ce qui donne une vraie API REST classique.
-
     @http.route('/api/v1/auth/token', type='http', auth='none', methods=['POST'], csrf=False)
     def auth_token(self, **kwargs):
         """Échange login/mot de passe contre une paire access_token / refresh_token.
 
-        Body JSON attendu : {"login": "...", "password": "...", "device": "..."}
+        Accepte à la fois :
+        1. Les identifiants custom hr.employee.credentials (découplés de res.users)
+        2. Le fallback Odoo res.users (pour les RH / managers d'origine)
         """
         data = _get_json_body()
         if data is None:
             return _error(400, 'invalid_request', "Corps de requête JSON invalide.")
 
-        login = data.get('login')
+        login_raw = data.get('login')
         password = data.get('password')
         device = data.get('device')
 
-        if not login or not password:
+        if not login_raw or not password:
             return _error(400, 'invalid_request', "Les paramètres 'login' et 'password' sont requis.")
 
+        login = login_raw.strip().lower()
         db = request.db
+
+        # 1. Vérification prioritaire dans hr.employee.credentials (découplé de res.users)
+        cred = request.env['hr.employee.credentials'].sudo().search([('login', '=', login)], limit=1)
+        if not cred:
+            # Essayer de chercher par e-mail pro de l'employé
+            emp = request.env['hr.employee'].sudo().search([('work_email', '=ilike', login)], limit=1)
+            if emp:
+                cred = request.env['hr.employee.credentials'].sudo().search([('employee_id', '=', emp.id)], limit=1)
+
+        if cred:
+            if not cred.is_active:
+                return _error(401, 'account_disabled', "Ce compte d'accès est désactivé. Veuillez contacter le RH.")
+
+            if cred.check_password(password):
+                cred.sudo().write({'last_login': fields.Datetime.now()})
+                employee = cred.employee_id
+                user = employee.user_id if employee.user_id else None
+                return _issue_token_pair_for_employee(employee, user=user, cred=cred, device=device)
+
+        # 2. Fallback Odoo classique (res.users) pour admin/demo/managers
         try:
-            uid = _authenticate(db, login, password)
+            uid = _authenticate(db, login_raw, password)
+            user = request.env['res.users'].sudo().browse(uid)
+            employee = request.env['hr.employee'].sudo().search([('user_id', '=', user.id)], limit=1)
+            return _issue_token_pair_for_employee(employee, user=user, cred=None, device=device)
         except AccessDenied:
             return _error(401, 'invalid_credentials', "Identifiants invalides.")
-        except Exception:
-            _logger.exception("Échec d'authentification API pour le login %s", login)
+        except Exception as exc:
+            _logger.exception("Échec d'authentification API pour %s: %s", login_raw, str(exc))
             return _error(401, 'invalid_credentials', "Identifiants invalides.")
-
-        user = request.env['res.users'].sudo().browse(uid)
-        return _issue_token_pair(user, device)
 
     @http.route('/api/v1/auth/refresh', type='http', auth='none', methods=['POST'], csrf=False)
     def auth_refresh(self, **kwargs):
-        """Échange un refresh_token valide contre une nouvelle paire de jetons.
-
-        Body JSON attendu : {"refresh_token": "..."}
-        Le refresh token utilisé est immédiatement révoqué (rotation), pour
-        limiter l'impact d'un vol de jeton.
-        """
+        """Échange un refresh_token valide contre une nouvelle paire de jetons."""
         data = _get_json_body()
         if data is None:
             return _error(400, 'invalid_request', "Corps de requête JSON invalide.")
@@ -82,14 +94,19 @@ class HrAiApiAuthController(http.Controller):
             return _error(401, 'invalid_grant', "Refresh token invalide, expiré ou révoqué.")
 
         record.revoked = True
-        return _issue_token_pair(record.user_id, record.device_info)
+
+        employee = record.employee_id or (
+            request.env['hr.employee'].sudo().search([('user_id', '=', record.user_id.id)], limit=1)
+            if record.user_id else None
+        )
+        user = record.user_id or (employee.user_id if employee else None)
+        cred = request.env['hr.employee.credentials'].sudo().search([('employee_id', '=', employee.id)], limit=1) if employee else None
+
+        return _issue_token_pair_for_employee(employee, user=user, cred=cred, device=record.device_info)
 
     @http.route('/api/v1/auth/revoke', type='http', auth='none', methods=['POST'], csrf=False)
     def auth_revoke(self, **kwargs):
-        """Révoque un refresh_token (déconnexion explicite depuis le mobile).
-
-        Body JSON attendu : {"refresh_token": "..."}
-        """
+        """Révoque un refresh_token (déconnexion explicite depuis le mobile)."""
         data = _get_json_body()
         if data is None:
             return _error(400, 'invalid_request', "Corps de requête JSON invalide.")
@@ -105,40 +122,86 @@ class HrAiApiAuthController(http.Controller):
         if record:
             record.revoked = True
 
-        # Réponse identique que le jeton existe ou non, pour ne pas
-        # divulguer d'information sur l'existence d'un refresh token.
         return request.make_json_response({'revoked': True})
 
     @http.route('/api/v1/auth/me', type='http', auth='none', methods=['GET'], csrf=False)
     @require_auth()
     def auth_me(self, **kwargs):
-        """Retourne le profil de l'utilisateur authentifié par l'access token."""
+        """Retourne le profil de l'utilisateur ou employé authentifié par l'access token."""
         payload = request.jwt_payload
-        user = request.env['res.users'].sudo().browse(int(payload['sub']))
-        employee = None
-        if payload.get('employee_id'):
-            employee = request.env['hr.employee'].sudo().browse(payload['employee_id'])
+        employee_id = payload.get('employee_id')
+        user_id = payload.get('user_id')
+
+        employee = request.env['hr.employee'].sudo().browse(employee_id) if employee_id else None
+        user = request.env['res.users'].sudo().browse(user_id) if user_id else None
+
+        must_change = payload.get('must_change_password', False)
+        if employee:
+            cred = request.env['hr.employee.credentials'].sudo().search([('employee_id', '=', employee.id)], limit=1)
+            if cred:
+                must_change = cred.must_change_password
 
         return request.make_json_response({
-            'user_id': user.id,
-            'name': user.name,
-            'login': user.login,
+            'user_id': user.id if user else None,
+            'name': employee.name if employee else (user.name if user else "Employé"),
+            'login': user.login if user else (employee.work_email or employee.name),
             'employee_id': employee.id if employee else None,
             'employee_name': employee.name if employee else None,
-            'role': payload.get('role'),
-            'scopes': payload.get('scopes'),
+            'role': payload.get('role', 'employee'),
+            'scopes': payload.get('scopes', []),
+            'must_change_password': must_change,
         })
+
+    @http.route('/api/v1/auth/change-password', type='http', auth='none', methods=['POST'], csrf=False)
+    @require_auth()
+    def change_password(self, **kwargs):
+        """Endpoint de modification obligatoire/volontaire du mot de passe."""
+        payload = request.jwt_payload
+        employee_id = payload.get('employee_id')
+        user_id = payload.get('user_id')
+
+        data = _get_json_body()
+        if data is None:
+            return _error(400, 'invalid_request', "Corps JSON invalide.")
+
+        old_password = data.get('old_password') or data.get('current_password')
+        new_password = data.get('new_password')
+
+        if not new_password or len(new_password) < 6:
+            return _error(400, 'weak_password', "Le nouveau mot de passe doit contenir au moins 6 caractères.")
+
+        # 1. Si compte hr.employee.credentials
+        if employee_id:
+            cred = request.env['hr.employee.credentials'].sudo().search([('employee_id', '=', employee_id)], limit=1)
+            if cred:
+                # Si must_change_password est True, on permet le changement direct (avec ou sans l'ancien mot de passe)
+                if not cred.must_change_password and old_password:
+                    if not cred.check_password(old_password):
+                        return _error(401, 'invalid_old_password', "Ancien mot de passe incorrect.")
+
+                cred.set_password(new_password)
+                cred.sudo().write({'must_change_password': False})
+                return request.make_json_response({
+                    'success': True,
+                    'message': "Mot de passe modifié avec succès.",
+                    'must_change_password': False,
+                })
+
+        # 2. Si compte res.users
+        if user_id:
+            user = request.env['res.users'].sudo().browse(user_id)
+            if user:
+                user.sudo().write({'password': new_password})
+                return request.make_json_response({
+                    'success': True,
+                    'message': "Mot de passe modifié avec succès.",
+                    'must_change_password': False,
+                })
+
+        return _error(400, 'account_not_found', "Compte introuvable.")
 
 
 def _authenticate(db, login, password):
-    """Authentifie un utilisateur Odoo et retourne son uid.
-
-    La signature de res.users.authenticate() a changé entre versions/
-    correctifs d'Odoo 17 : certains builds attendent
-    (db, login, password, user_agent_env) [confirmé par nos tests], d'autres
-    (db, credential_dict, user_agent_env). On essaie la première (la plus
-    répandue), puis on retombe sur la seconde si elle échoue par TypeError.
-    """
     Users = request.env['res.users']
     user_agent_env = {'interactive': False}
     try:
@@ -150,11 +213,6 @@ def _authenticate(db, login, password):
 
 
 def _get_json_body():
-    """Parse le corps de la requête HTTP comme du JSON brut.
-
-    Retourne un dict, {} si le corps est vide, ou None si le JSON est
-    invalide (à charge de l'appelant de renvoyer une erreur 400).
-    """
     raw = request.httprequest.get_data()
     if not raw:
         return {}
@@ -164,19 +222,24 @@ def _get_json_body():
         return None
 
 
-def _issue_token_pair(user, device=None):
-    """Construit et enregistre une nouvelle paire access_token/refresh_token
-    pour l'utilisateur donné. Factorisé car utilisé par /auth/token ET
-    /auth/refresh (rotation)."""
-    employee = request.env['hr.employee'].sudo().search([('user_id', '=', user.id)], limit=1)
-    role = role_for_user(user)
+def _issue_token_pair_for_employee(employee, user=None, cred=None, device=None):
+    must_change = cred.must_change_password if cred else False
+
+    if user:
+        role = role_for_user(user)
+    else:
+        role = 'employee'
+
     scopes = scopes_for_role(role)
 
-    access_token = encode_access_token(request.env, user, employee, scopes, role)
+    access_token = encode_access_token(
+        request.env, user, employee, scopes, role, must_change_password=must_change
+    )
     refresh_raw = generate_refresh_token()
 
     request.env['api.auth.token'].sudo().create({
-        'user_id': user.id,
+        'user_id': user.id if user else False,
+        'employee_id': employee.id if employee else False,
         'token_hash': hash_token(refresh_raw),
         'scope': ' '.join(scopes),
         'device_info': device or '',
@@ -189,6 +252,7 @@ def _issue_token_pair(user, device=None):
         'token_type': 'Bearer',
         'expires_in': ACCESS_TOKEN_TTL_MINUTES * 60,
         'scope': ' '.join(scopes),
+        'must_change_password': must_change,
     })
 
 

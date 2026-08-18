@@ -40,6 +40,7 @@
         'data/ir_cron_weekly_summary.xml',
         'views/smart_hr_ai_dashboard_views.xml',
         'views/hr_weekly_summary_views.xml',
+        'views/hr_employee_credentials_views.xml',
         'views/smart_hr_ai_menus.xml',
     ],
     'demo': [],
