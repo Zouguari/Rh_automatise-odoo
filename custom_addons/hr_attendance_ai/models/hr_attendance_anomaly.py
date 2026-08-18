@@ -17,15 +17,33 @@ class HrAttendanceAnomaly(models.Model):
         [
             ('missing_checkout', "Pointage de sortie manquant"),
             ('repeated_lateness', "Retards répétés"),
+            ('user_reported', "Signalement employé"),
         ],
         required=True,
     )
+    status = fields.Selection(
+        [
+            ('pending', "En attente"),
+            ('resolved', "Traité"),
+            ('rejected', "Rejeté"),
+        ],
+        string="Statut réclamation",
+        default='pending',
+    )
+    date_concerned = fields.Date(string="Date concernée")
+    comment = fields.Text(string="Commentaire employé")
+    rh_comment = fields.Text(string="Réponse / Commentaire RH")
+    attachment_base64 = fields.Text(string="Pièce jointe (base64)")
+    attachment_name = fields.Char(string="Nom du fichier")
     detected_on = fields.Datetime(string="Détectée le", default=fields.Datetime.now)
     notes = fields.Text()
     resolved = fields.Boolean(string="Résolue", default=False)
 
     def action_mark_resolved(self):
-        self.write({'resolved': True})
+        self.write({'resolved': True, 'status': 'resolved'})
+
+    def action_mark_rejected(self):
+        self.write({'status': 'rejected'})
 
     @api.model
     def _cron_detect_attendance_anomalies(self):

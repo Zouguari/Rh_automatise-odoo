@@ -33,7 +33,7 @@
         'hr_appraisal_ai',
     ],
     'external_dependencies': {
-        'python': ['jwt'],  # PyJWT — pip install PyJWT
+        'python': ['PyJWT'],  # PyJWT — pip install PyJWT
     },
     'data': [
         'security/ir.model.access.csv',
