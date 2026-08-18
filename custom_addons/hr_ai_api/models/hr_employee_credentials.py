@@ -12,20 +12,24 @@ _logger = logging.getLogger(__name__)
 
 class HrEmployeeCredentials(models.Model):
     _name = 'hr.employee.credentials'
+    _inherit = ['mail.thread']
     _description = "Identifiants de connexion employés (Application Mobile)"
     _order = 'create_date desc'
 
     employee_id = fields.Many2one(
-        'hr.employee', string="Employé", required=True, ondelete='cascade', index=True,
+        'hr.employee', string="Employé", required=True, ondelete='cascade', index=True, tracking=True,
     )
-    login = fields.Char(string="Identifiant / E-mail pro", required=True, index=True)
+    login = fields.Char(string="Identifiant / E-mail pro", required=True, index=True, tracking=True)
     password_hash = fields.Char(string="Empreinte du mot de passe", required=True)
     must_change_password = fields.Boolean(
-        string="Doit changer le mot de passe", default=True,
+        string="Doit changer le mot de passe", default=True, tracking=True,
         help="Si vrai, l'employé sera redirigé vers l'écran de changement de mot de passe lors de sa connexion."
     )
-    is_active = fields.Boolean(string="Accès actif", default=True)
-    last_login = fields.Datetime(string="Dernière connexion")
+    is_active = fields.Boolean(string="Accès actif", default=True, tracking=True)
+    last_login = fields.Datetime(string="Dernière connexion", tracking=True)
+
+    last_password_reset = fields.Datetime(string="Dernière réinitialisation", readonly=True, tracking=True)
+    reset_by = fields.Many2one('res.users', string="Réinitialisé par", readonly=True, tracking=True)
 
     _sql_constraints = [
         ('employee_id_uniq', 'unique(employee_id)', "Cet employé a déjà un compte d'accès créé."),
@@ -47,6 +51,44 @@ class HrEmployeeCredentials(models.Model):
         if not self.password_hash or not raw_password:
             return False
         return check_password_hash(self.password_hash, raw_password)
+
+    def action_reset_password(self):
+        """Réinitialise le mot de passe de l'employé, génère un mot de passe temporaire,
+        loggue l'action dans le chatter et ouvre le wizard d'affichage unique.
+        """
+        self.ensure_one()
+        temp_password = self._generate_temp_password()
+        pwd_hash = generate_password_hash(temp_password)
+
+        now = fields.Datetime.now()
+        user = self.env.user
+
+        self.write({
+            'password_hash': pwd_hash,
+            'must_change_password': True,
+            'last_password_reset': now,
+            'reset_by': user.id,
+        })
+
+        # Traçabilité dans le chatter (sans le mot de passe en clair)
+        self.message_post(
+            body="🔑 Le mot de passe d'accès mobile a été réinitialisé par <b>%s</b>." % user.name,
+            subject="Réinitialisation de mot de passe",
+        )
+
+        wizard = self.env['hr.employee.credentials.reset.wizard'].create({
+            'employee_id': self.employee_id.id,
+            'temp_password': temp_password,
+        })
+
+        return {
+            'name': "Mot de passe temporaire généré",
+            'type': 'ir.actions.act_window',
+            'res_model': 'hr.employee.credentials.reset.wizard',
+            'res_id': wizard.id,
+            'view_mode': 'form',
+            'target': 'new',
+        }
 
     @api.model
     def create_for_employee(self, employee, login=None, password=None, must_change=True):
@@ -78,11 +120,7 @@ class HrEmployeeCredentials(models.Model):
 
     @api.model
     def action_bulk_generate_employee_credentials(self):
-        """Script d'activation en masse pour tous les employés n'ayant pas de compte.
-        
-        Génère des accès sécurisés pour les 17 employés et enregistre le rapport
-        dans un fichier CSV d'export sécurisé.
-        """
+        """Script d'activation en masse pour tous les employés n'ayant pas de compte."""
         employees = self.env['hr.employee'].sudo().search([])
         created_list = []
 

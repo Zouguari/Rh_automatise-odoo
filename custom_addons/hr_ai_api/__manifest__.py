@@ -22,6 +22,7 @@
     'website': 'https://www.example.com',
     'depends': [
         'base',
+        'mail',
         'hr',
         'hr_recruitment_ai_assistant',
         'hr_holidays',
@@ -41,6 +42,7 @@
         'views/smart_hr_ai_dashboard_views.xml',
         'views/hr_weekly_summary_views.xml',
         'views/hr_employee_credentials_views.xml',
+        'views/hr_employee_credentials_reset_wizard_views.xml',
         'views/smart_hr_ai_menus.xml',
     ],
     'demo': [],
