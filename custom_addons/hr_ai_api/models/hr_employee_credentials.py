@@ -138,4 +138,14 @@ class HrEmployeeCredentials(models.Model):
             })
 
         _logger.info("Génération d'accès en masse : %d comptes d'employés créés.", len(created_list))
-        return created_list
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Génération d\'accès mobiles',
+                'message': '%d compte(s) d\'accès mobile créé(s) avec succès.' % len(created_list),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.act_window_close'},
+            }
+        }
