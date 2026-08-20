@@ -118,6 +118,40 @@ class HrEmployeeCredentials(models.Model):
         alphabet = string.ascii_letters + string.digits
         return 'Emp-' + ''.join(secrets.choice(alphabet) for _ in range(length))
 
+    def _reset_password_silent(self):
+        """Réinitialise le mot de passe sans ouvrir de wizard (usage automatisé)."""
+        self.ensure_one()
+        temp_password = self._generate_temp_password()
+        self.write({
+            'password_hash': generate_password_hash(temp_password),
+            'must_change_password': True,
+            'last_password_reset': fields.Datetime.now(),
+            'is_active': True,
+        })
+        return temp_password
+
+    @api.model
+    def provision_for_employee(self, employee, login=None):
+        """Crée ou réinitialise l'accès mobile d'un employé.
+
+        Retourne (credentials, mot_de_passe_temporaire_en_clair).
+        """
+        login_val = (login or employee.work_email or employee.private_email or '').strip().lower()
+        if not login_val:
+            raise UserError(
+                "Impossible de créer l'accès mobile pour %s : aucun e-mail "
+                "professionnel ou identifiant disponible." % employee.name
+            )
+
+        existing = self.search([('employee_id', '=', employee.id)], limit=1)
+        if existing:
+            if existing.login != login_val:
+                existing.write({'login': login_val})
+            return existing, existing._reset_password_silent()
+
+        cred, temp_pwd = self.create_for_employee(employee, login=login_val, must_change=True)
+        return cred, temp_pwd
+
     @api.model
     def action_bulk_generate_employee_credentials(self):
         """Script d'activation en masse pour tous les employés n'ayant pas de compte."""

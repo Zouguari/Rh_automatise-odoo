@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <record id="config_mobile_app_name" model="ir.config_parameter">
+        <field name="key">hr_ai_api.mobile_app_name</field>
+        <field name="value">Smart HR AI</field>
+    </record>
+
+    <!-- URL de téléchargement ou deeplink de l'app mobile (Play Store, App Store, etc.) -->
+    <record id="config_mobile_app_url" model="ir.config_parameter">
+        <field name="key">hr_ai_api.mobile_app_url</field>
+        <field name="value"></field>
+    </record>
+
+</odoo>

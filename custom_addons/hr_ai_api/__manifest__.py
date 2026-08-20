@@ -38,6 +38,7 @@
     },
     'data': [
         'security/ir.model.access.csv',
+        'data/ir_config_parameter_data.xml',
         'data/ir_cron_weekly_summary.xml',
         'views/smart_hr_ai_dashboard_views.xml',
         'views/hr_weekly_summary_views.xml',
