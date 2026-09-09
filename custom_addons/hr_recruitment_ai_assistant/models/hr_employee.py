@@ -2,6 +2,7 @@
 import json
 import logging
 import re
+from markupsafe import Markup
 from odoo import models, fields, api
 
 from .hr_applicant import SKILL_LEVEL_TARGET_PROGRESS
@@ -248,16 +249,24 @@ class HrEmployee(models.Model):
                 })
 
                 # Log chatter notification
+                # NOTE : `body` doit être un `Markup` (markupsafe) et non une
+                # simple f-string. Depuis Odoo 16/17, le champ Html de
+                # message_post échappe automatiquement tout texte non
+                # explicitement marqué comme HTML de confiance (protection
+                # anti-XSS) : sans Markup(), les balises <strong>/<br/> sont
+                # affichées littéralement dans le chatter au lieu d'être
+                # interprétées. Les valeurs dynamiques sont insérées via
+                # .format() sur le Markup, ce qui les échappe correctement
+                # si elles contenaient elles-mêmes des caractères spéciaux.
                 score_display = f"{emp.ai_recruitment_score:.1f}" if emp.ai_recruitment_score else "N/A"
-                emp.message_post(
-                    body=(
-                        f"🚀 <strong>Onboarding IA finalisé automatiquement</strong><br/>"
-                        f"• Transfert des données candidat effectué (Score IA Recrutement: {score_display}/100).<br/>"
-                        f"• Compétences de base enregistrées dans le profil.<br/>"
-                        f"• Évaluation initiale de performance générée.<br/>"
-                        f"• Plan de compétences et formations recommandées prêts."
-                    )
-                )
+                body = Markup(
+                    "🚀 <strong>Onboarding IA finalisé automatiquement</strong><br/>"
+                    "• Transfert des données candidat effectué (Score IA Recrutement: {score}/100).<br/>"
+                    "• Compétences de base enregistrées dans le profil.<br/>"
+                    "• Évaluation initiale de performance générée.<br/>"
+                    "• Plan de compétences et formations recommandées prêts."
+                ).format(score=score_display)
+                emp.message_post(body=body)
             except Exception as e:
                 _logger.error("Erreur lors de l'Onboarding IA pour l'employé %s : %s", emp.name, e, exc_info=True)
 
@@ -426,3 +435,4 @@ class HrEmployee(models.Model):
             return False
         target = SKILL_LEVEL_TARGET_PROGRESS.get(level_label, 50)
         return min(levels, key=lambda l: abs(l.level_progress - target))
+    
